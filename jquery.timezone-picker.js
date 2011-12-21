@@ -8,11 +8,14 @@
         map.lastInfoWindow.close();
       }
 
+      // TODO: Add more information to this bubble
       var infowindow = new google.maps.InfoWindow({
         content: '<h1>' + marker.data.olsonName + '</h1>',
         maxWidth: 500
       });
       infowindow.open(map, marker);
+
+      // TODO: Add a select button and call options.onSelected or something
 
       map.lastInfoWindow = infowindow;
     });
@@ -20,18 +23,21 @@
 
   var methods = {
     init: function(options) {
+      // Populate the options and set defaults
       _options = options || {};
       _options.initialZoom = _options.initialZoom || 2;
       _options.initialLat = _options.initialLat || 0;
       _options.initialLng = _options.initialLng || 0;
       _options.dotImageUrl = _options.dotImageUrl || DEFAULT_DOT;
 
+      // Create the maps instance
       map = new google.maps.Map(this.get(0), {
         zoom: _options.initialZoom,
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         center: new google.maps.LatLng(_options.initialLat, _options.initialLng)
       });
 
+      // Add a marker for each zone in the zones blob
       $.each(_zones, function(i, zone) {
         var marker = new google.maps.Marker({
           position: new google.maps.LatLng(zone.lat, zone.lng),
