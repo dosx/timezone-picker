@@ -9,11 +9,33 @@
       }
 
       // TODO: Add more information to this bubble
+      var id = marker.data.olsonName.toLowerCase().replace(/[^a-z0-9]/g, '_');
       var infowindow = new google.maps.InfoWindow({
-        content: '<h1>' + marker.data.olsonName + '</h1>',
+        content: '<div id="' + id + '"><center><h1>' + marker.data.olsonName +
+          '</h1><button>Use Timezone</button><button>Cancel</button><center>' +
+          '</div>',
         maxWidth: 500
       });
+      google.maps.event.addListener(infowindow, 'domready', function() {
+        $('#' + id + ' button:eq(0)').click(function(e) {
+          if (e.which > 1) {
+            return;
+          }
+
+          if (_options.onSelected) {
+            _options.onSelected(marker.data.olsonName);
+          }
+        });
+
+        $('#' + id + ' button:eq(1)').click(function(e) {
+          if (e.which > 1) {
+            return;
+          }
+          infowindow.close();
+        });
+      });
       infowindow.open(map, marker);
+
 
       // TODO: Add a select button and call options.onSelected or something
 
