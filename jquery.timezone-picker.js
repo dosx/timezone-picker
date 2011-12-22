@@ -20,7 +20,7 @@
     }
 
     $.get(_options.jsonRootUrl + 'polygons/' + name + '.json', function(data) {
-      data = JSON.parse(data);
+      data = typeof(data) === 'string' ? JSON.parse(data) : data;
 
       _mapZones[name] = [];
       $.each(data.polygons, function(i, polygon) {
@@ -114,7 +114,7 @@
       });
 
       $.get(_options.jsonRootUrl + 'bounding_boxes.json', function(data) {
-        boundingBoxes = JSON.parse(data);
+        boundingBoxes = typeof(data) === 'string' ? JSON.parse(data) : data;
       });
 
       google.maps.event.addListener(_map, 'click', function(e) {
