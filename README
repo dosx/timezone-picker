@@ -7,10 +7,12 @@ Python 2.6+
 Usage
 -----
 See example.html
-Run 'python -m SimpleHTTPServer' and hit http://localhost:8000/example.html
+- tar xvf tz_json
+- python -m SimpleHTTPServer'
+- http://localhost:8000/example.html
 
-To use in your site, copy /tz_json to a web-accessible location on your server
-and pass in the jsonRootUrl option to point to it
+To use in your site, extract tz_json.tgz to a web-accessible location on your
+server and pass in the path as the jsonRootUrl option
 
 Options
 -------
