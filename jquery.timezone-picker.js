@@ -14,81 +14,119 @@
     _mapZones = {};
   };
 
-  var drawZone = function(name) {
+  var drawZone = function(name, lat, lng) {
     if (_mapZones[name]) {
       return;
     }
 
     $.get(_options.jsonRootUrl + 'polygons/' + name + '.json', function(data) {
-      data = typeof(data) === 'string' ? JSON.parse(data) : data;
+      data = typeof data === 'string' ? JSON.parse(data) : data;
 
+      var inZone = false;
+      var allCoords = [];
+      var maxPoints = 0;
+      var centroid;
       _mapZones[name] = [];
       $.each(data.polygons, function(i, polygon) {
+        // Ray casting counters for hit testing. Both having odd counts mean
+        // the point is in the polygon
+        var latTest = 0;
+        var lngTest = 0;
+        var lastPoint = polygon.points[polygon.points.length - 1];
+
         var coords = [];
         $.each(polygon.points, function(j, point) {
           coords.push(new google.maps.LatLng(point.y, point.x));
-        });
 
-        var mapPolygon = new google.maps.Polygon({
-          paths: coords,
-          strokeColor: '#ff0000',
-          strokeOpacity: 0.7,
-          strokeWeight: 1,
-          fillColor: '#ffcccc',
-          fillOpacity: 0.5
-        });
-        mapPolygon.setMap(_map);
-
-        google.maps.event.addListener(mapPolygon, 'click', function() {
-          if (_map.lastInfoWindow) {
-            _map.lastInfoWindow.close();
+          // Ray casting tests
+          if (((lastPoint.y <= lat && point.y >= lat) ||
+            (lastPoint.y > lat && point.y < lat)) &&
+            (lastPoint.x < lng || point.x < lng)) {
+            latTest++;
+          }
+          if (((lastPoint.x <= lng && point.x >= lng) ||
+            (lastPoint.x > lng && point.x < lng)) &&
+            (lastPoint.y < lat || point.y < lat)) {
+            lngTest++;
           }
 
-          // TODO: Add more information to this bubble
-          var id = data.name.toLowerCase().replace(
-            /[^a-z0-9]/g, '_');
-          var infowindow = new google.maps.InfoWindow({
-            content: '<div id="' + id + '"><center>' +
-              '<h1>' + data.name + '</h1>' +
-              '<button>Use Timezone</button><button>Cancel</button>' +
-              '</center></div>',
-            maxWidth: 500
-          });
-
-          google.maps.event.addListener(infowindow, 'domready', function() {
-            $('#' + id + ' button:eq(0)').click(function(e) {
-              if (e.which > 1) {
-                return;
-              }
-
-              if (_options.onSelected) {
-                _options.onSelected(data.name);
-              }
-
-              e.preventDefault();
-              return false;
-            });
-
-            $('#' + id + ' button:eq(1)').click(function(e) {
-              if (e.which > 1) {
-                return;
-              }
-              infowindow.close();
-              e.preventDefault();
-              return false;
-            });
-          });
-          infowindow.setPosition(new google.maps.LatLng(
-            polygon.centroid[1],
-            polygon.centroid[0]
-          ));
-          infowindow.open(_map);
-
-          _map.lastInfoWindow = infowindow;
+          lastPoint = point;
         });
 
-        _mapZones[name].push(mapPolygon);
+        allCoords.push(coords);
+
+        // If the count is odd in each dimension, we are in the polygon
+        inZone |= (latTest % 2 === 1) && (lngTest % 2 === 1);
+
+        // Hack to get the centroid of the largest area polygon - we just check
+        // which has the most edges
+        if (polygon.points.length > maxPoints) {
+          centroid = polygon.centroid;
+          maxPoints = polygon.points.length;
+        }
       });
+
+      if (inZone) {
+        $.each(allCoords, function(i, coords) {
+          var mapPolygon = new google.maps.Polygon({
+            paths: coords,
+            strokeColor: '#ff0000',
+            strokeOpacity: 0.7,
+            strokeWeight: 1,
+            fillColor: '#ffcccc',
+            fillOpacity: 0.5
+          });
+          mapPolygon.setMap(_map);
+
+          _mapZones[name].push(mapPolygon);
+        });
+
+        if (_map.lastInfoWindow) {
+          _map.lastInfoWindow.close();
+        }
+
+        // TODO: Add more information to this bubble
+        var id = data.name.toLowerCase().replace(
+          /[^a-z0-9]/g, '_');
+        var infowindow = new google.maps.InfoWindow({
+          content: '<div id="' + id + '"><center>' +
+            '<h1>' + data.name + '</h1>' +
+            '<button>Use Timezone</button><button>Cancel</button>' +
+            '</center></div>',
+          maxWidth: 500
+        });
+
+        google.maps.event.addListener(infowindow, 'domready', function() {
+          $('#' + id + ' button:eq(0)').click(function(e) {
+            if (e.which > 1) {
+              return;
+            }
+
+            if (_options.onSelected) {
+              _options.onSelected(data.name);
+            }
+
+            e.preventDefault();
+            return false;
+          });
+
+          $('#' + id + ' button:eq(1)').click(function(e) {
+            if (e.which > 1) {
+              return;
+            }
+            infowindow.close();
+            e.preventDefault();
+            return false;
+          });
+        });
+        infowindow.setPosition(new google.maps.LatLng(
+          centroid[1],
+          centroid[0]
+        ));
+        infowindow.open(_map);
+
+        _map.lastInfoWindow = infowindow;
+      }
     });
   };
 
@@ -114,7 +152,7 @@
       });
 
       $.get(_options.jsonRootUrl + 'bounding_boxes.json', function(data) {
-        boundingBoxes = typeof(data) === 'string' ? JSON.parse(data) : data;
+        _boundingBoxes = typeof data === 'string' ? JSON.parse(data) : data;
       });
 
       google.maps.event.addListener(_map, 'click', function(e) {
@@ -122,7 +160,7 @@
         var lng = e.latLng.Ra;
 
         var candidates = [];
-        $.each(boundingBoxes, function(i, v) {
+        $.each(_boundingBoxes, function(i, v) {
           var bb = v.boundingBox;
           if (lat > bb.ymin && lat < bb.ymax && lng > bb.xmin && lng < bb.xmax) {
             candidates.push(v.name.toLowerCase().replace(/[^a-z0-9]/g, '-'));
@@ -135,7 +173,7 @@
 
         clearZones();
         $.each(candidates, function(i, v) {
-          drawZone(v);
+          drawZone(v, lat, lng);
         });
       });
      }
@@ -145,7 +183,7 @@
     if (methods[method]) {
       return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
     }
-    else if (typeof(method === 'object') || !method) {
+    else if (typeof method === 'object' || !method) {
       return methods.init.apply(this, arguments);
     }
     else {
