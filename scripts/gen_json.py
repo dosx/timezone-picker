@@ -9,13 +9,14 @@ def simplify(points):
     polygon = Polygon(map(lambda x: (x["x"], x["y"]), points))
     polygon = polygon.simplify(0.025)
     return {
-        "points": map(lambda x: {"x": x[0], "y": x[1]}, 
+        "points": map(lambda x: {"x": x[0], "y": x[1]},
             polygon.exterior.coords),
         "centroid": (polygon.centroid.x, polygon.centroid.y)
     }
 
 def collate_zones(shape_file):
-    zones = {} 
+    zones = {}
+    print "Loading SHP file..."
     rows = shpUtils.loadShapefile(shape_file)
     for row in rows:
         name = row["dbf_data"]["TZID"].strip()
@@ -26,8 +27,8 @@ def collate_zones(shape_file):
             "bounding_box": {
                 "xmin": sys.maxint,
                 "ymin": sys.maxint,
-                "xmax": -sys.maxint - 1,
-                "ymax": -sys.maxint - 1
+                "xmax":-sys.maxint - 1,
+                "ymax":-sys.maxint - 1
             },
             "polygons": []
         })

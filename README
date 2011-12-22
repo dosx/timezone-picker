@@ -3,22 +3,14 @@ Prerequisites
 jQuery
 Google Maps Javascript API v3
 Python 2.6+
-Shapely (http://pypi.python.org/pypi/Shapely)
-
-Data File Generation
---------------------
-This plugin needs a bunch of timezone data files to be sitting on a server.
-bounding_boxes.json: an array of bounding boxes for each timezone (for hit testing)
-polygons/*.json: polygon definitions for each timezone
-
-To Generate all timezone data JSON files
-- Download and extract the tz_world file from http://efele.net/maps/tz/world/tz_world.zip
-- python script/gen_json.py <path-to-tz_world.shp> <output-dir>
 
 Usage
 -----
 See example.html
 Run 'python -m SimpleHTTPServer' and hit http://localhost:8000/example.html
+
+To use in your site, copy /tz_json to a web-accessible location on your server
+and pass in the jsonRootUrl option to point to it
 
 Options
 -------
@@ -30,7 +22,21 @@ strokeWeight: the width of the outline of rendered timezones (default 2)
 strokeOpacity: the opacity of the outline of rendered timezones (default 0.7)
 fillColor: the color of the fill of the rendered timezones (default '#ffcccc')
 fillOpacity: the opacity of the outline of rendered timezones (default 0.5)
-jsonRootUrl: the default root URL for the JSON data files (default '/')
+jsonRootUrl: the default root URL for the JSON data files (default '/tz_json/')
+
+For Data File Generation
+------------------------
+Requires shapely (http://pypi.python.org/pypi/Shapely or sudo pip install shapely)
+Requires libgeos-dev (sudo apt-get install libgeos-dev)
+
+This plugin needs a bunch of timezone data files to be sitting on a server.
+bounding_boxes.json: an array of bounding boxes for each timezone (for hit testing)
+polygons/*.json: polygon definitions for each timezone
+
+To Generate all timezone data JSON files
+- Download and extract the tz_world file from http://efele.net/maps/tz/world/tz_world.zip
+- python script/gen_json.py <path-to-tz_world.shp> <output-dir>
+- Wait a long time...
 
 Acknowledgments
 ----------------
