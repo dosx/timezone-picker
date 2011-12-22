@@ -1,45 +1,94 @@
 (function($) {
+  var _boundingBoxes;
   var _map;
   var _options;
+  var _mapZones = {};
 
-  var addInfoWindow = function(marker) {
-    google.maps.event.addListener(marker, 'click', function() {
-      if (map.lastInfoWindow) {
-        map.lastInfoWindow.close();
-      }
-
-      // TODO: Add more information to this bubble
-      var id = marker.data.olsonName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      var infowindow = new google.maps.InfoWindow({
-        content: '<div id="' + id + '"><center><h1>' + marker.data.olsonName +
-          '</h1><button>Use Timezone</button><button>Cancel</button><center>' +
-          '</div>',
-        maxWidth: 500
+  var clearZones = function() {
+    $.each(_mapZones, function(i, zone) {
+      $.each(zone, function(j, polygon) {
+        polygon.setMap(null);
       });
-      google.maps.event.addListener(infowindow, 'domready', function() {
-        $('#' + id + ' button:eq(0)').click(function(e) {
-          if (e.which > 1) {
-            return;
-          }
+    });
 
-          if (_options.onSelected) {
-            _options.onSelected(marker.data.olsonName);
-          }
+    _mapZones = {};
+  };
+
+  var drawZone = function(name) {
+    if (_mapZones[name]) {
+      return;
+    }
+
+    $.get(_options.jsonRootUrl + 'polygons/' + name + '.json', function(data) {
+      data = JSON.parse(data);
+
+      _mapZones[name] = [];
+      $.each(data.polygons, function(i, polygon) {
+        var coords = [];
+        $.each(polygon.points, function(j, point) {
+          coords.push(new google.maps.LatLng(point.y, point.x));
         });
 
-        $('#' + id + ' button:eq(1)').click(function(e) {
-          if (e.which > 1) {
-            return;
-          }
-          infowindow.close();
+        var mapPolygon = new google.maps.Polygon({
+          paths: coords,
+          strokeColor: '#ff0000',
+          strokeOpacity: 0.7,
+          strokeWeight: 1,
+          fillColor: '#ffcccc',
+          fillOpacity: 0.5
         });
+        mapPolygon.setMap(_map);
+
+        google.maps.event.addListener(mapPolygon, 'click', function() {
+          if (_map.lastInfoWindow) {
+            _map.lastInfoWindow.close();
+          }
+
+          // TODO: Add more information to this bubble
+          var id = data.name.toLowerCase().replace(
+            /[^a-z0-9]/g, '_');
+          var infowindow = new google.maps.InfoWindow({
+            content: '<div id="' + id + '"><center>' +
+              '<h1>' + data.name + '</h1>' +
+              '<button>Use Timezone</button><button>Cancel</button>' +
+              '</center></div>',
+            maxWidth: 500
+          });
+
+          google.maps.event.addListener(infowindow, 'domready', function() {
+            $('#' + id + ' button:eq(0)').click(function(e) {
+              if (e.which > 1) {
+                return;
+              }
+
+              if (_options.onSelected) {
+                _options.onSelected(data.name);
+              }
+
+              e.preventDefault();
+              return false;
+            });
+
+            $('#' + id + ' button:eq(1)').click(function(e) {
+              if (e.which > 1) {
+                return;
+              }
+              infowindow.close();
+              e.preventDefault();
+              return false;
+            });
+          });
+          infowindow.setPosition(new google.maps.LatLng(
+            polygon.centroid[1],
+            polygon.centroid[0]
+          ));
+          infowindow.open(_map);
+
+          _map.lastInfoWindow = infowindow;
+        });
+
+        _mapZones[name].push(mapPolygon);
       });
-      infowindow.open(map, marker);
-
-
-      // TODO: Add a select button and call options.onSelected or something
-
-      map.lastInfoWindow = infowindow;
     });
   };
 
@@ -50,28 +99,46 @@
       _options.initialZoom = _options.initialZoom || 2;
       _options.initialLat = _options.initialLat || 0;
       _options.initialLng = _options.initialLng || 0;
-      _options.dotImageUrl = _options.dotImageUrl || DEFAULT_DOT;
+      _options.strokeColor = _options.strokeColor || '#ff0000';
+      _options.strokeWeight = _options.strokeWeight || 2;
+      _options.strokeOpacity = _options.strokeOpacity || 0.7;
+      _options.fillColor = _options.fillColor || '#ffcccc';
+      _options.fillOpacity = _options.fillOpacity || 0.5;
+      _options.jsonRootUrl = _options.jsonRootUrl || '/';
 
       // Create the maps instance
-      map = new google.maps.Map(this.get(0), {
+      _map = new google.maps.Map(this.get(0), {
         zoom: _options.initialZoom,
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         center: new google.maps.LatLng(_options.initialLat, _options.initialLng)
       });
 
-      // Add a marker for each zone in the zones blob
-      $.each(_zones, function(i, zone) {
-        var marker = new google.maps.Marker({
-          position: new google.maps.LatLng(zone.lat, zone.lng),
-          map: map,
-          title: zone.olsonName,
-          icon: new google.maps.MarkerImage(_options.dotImageUrl, null, null, new google.maps.Point(6, 6))
-        });
-        marker.data = zone;
-
-        addInfoWindow(marker);
+      $.get(_options.jsonRootUrl + 'bounding_boxes.json', function(data) {
+        boundingBoxes = JSON.parse(data);
       });
-    }
+
+      google.maps.event.addListener(_map, 'click', function(e) {
+        var lat = e.latLng.Qa;
+        var lng = e.latLng.Ra;
+
+        var candidates = [];
+        $.each(boundingBoxes, function(i, v) {
+          var bb = v.boundingBox;
+          if (lat > bb.ymin && lat < bb.ymax && lng > bb.xmin && lng < bb.xmax) {
+            candidates.push(v.name.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+          }
+        });
+
+        if (_map.lastInfoWindow) {
+          _map.lastInfoWindow.close();
+        }
+
+        clearZones();
+        $.each(candidates, function(i, v) {
+          drawZone(v);
+        });
+      });
+     }
   };
 
   $.fn.timezonePicker = function(method) {
@@ -85,9 +152,5 @@
       $.error('Method ' + method + ' does not exist on jQuery.timezonePicker.');
     }
   };
-
-  // Ugly string constants
-  var _zones = JSON.parse('[{"olsonName":"Europe/Andorra","lat":43.5,"lng":1.5166666666666666},{"olsonName":"Asia/Dubai","lat":25.3,"lng":55.3},{"olsonName":"Asia/Kabul","lat":34.516666666666666,"lng":69.2},{"olsonName":"America/Antigua","lat":17.05,"lng":-61.8},{"olsonName":"America/Anguilla","lat":18.2,"lng":-63.06666666666667},{"olsonName":"Europe/Tirane","lat":41.333333333333336,"lng":19.833333333333332},{"olsonName":"Asia/Yerevan","lat":40.18333333333333,"lng":44.5},{"olsonName":"Africa/Luanda","lat":-8.8,"lng":13.233333333333333},{"olsonName":"Antarctica/McMurdo","lat":-77.83333333333333,"lng":166.6},{"olsonName":"Antarctica/South_Pole","lat":-90,"lng":0},{"olsonName":"Antarctica/Rothera","lat":-67.56666666666666,"lng":-68.13333333333334},{"olsonName":"Antarctica/Palmer","lat":-64.8,"lng":-64.1},{"olsonName":"Antarctica/Mawson","lat":-67.6,"lng":62.88333333333333},{"olsonName":"Antarctica/Davis","lat":-68.58333333333333,"lng":77.96666666666667},{"olsonName":"Antarctica/Casey","lat":-66.28333333333333,"lng":110.51666666666667},{"olsonName":"Antarctica/Vostok","lat":-78.4,"lng":106.9},{"olsonName":"Antarctica/DumontDUrville","lat":-66.66666666666667,"lng":140.01666666666668},{"olsonName":"Antarctica/Syowa","lat":-69.00611111111111,"lng":39.59},{"olsonName":"Antarctica/Macquarie","lat":-54.5,"lng":158.95},{"olsonName":"America/Argentina/Buenos_Aires","lat":-34.6,"lng":-58.45},{"olsonName":"America/Argentina/Cordoba","lat":-31.4,"lng":-64.18333333333334},{"olsonName":"America/Argentina/Salta","lat":-24.783333333333335,"lng":-65.41666666666667},{"olsonName":"America/Argentina/Jujuy","lat":-24.183333333333334,"lng":-65.3},{"olsonName":"America/Argentina/Tucuman","lat":-26.816666666666666,"lng":-65.21666666666667},{"olsonName":"America/Argentina/Catamarca","lat":-28.466666666666665,"lng":-65.78333333333333},{"olsonName":"America/Argentina/La_Rioja","lat":-29.433333333333334,"lng":-66.85},{"olsonName":"America/Argentina/San_Juan","lat":-31.533333333333335,"lng":-68.51666666666667},{"olsonName":"America/Argentina/Mendoza","lat":-32.88333333333333,"lng":-68.81666666666666},{"olsonName":"America/Argentina/San_Luis","lat":-33.31666666666667,"lng":-66.35},{"olsonName":"America/Argentina/Rio_Gallegos","lat":-51.63333333333333,"lng":-69.21666666666667},{"olsonName":"America/Argentina/Ushuaia","lat":-54.8,"lng":-68.3},{"olsonName":"Pacific/Pago_Pago","lat":-14.266666666666667,"lng":-170.7},{"olsonName":"Europe/Vienna","lat":48.21666666666667,"lng":16.333333333333332},{"olsonName":"Australia/Lord_Howe","lat":-31.55,"lng":159.08333333333334},{"olsonName":"Australia/Hobart","lat":-42.88333333333333,"lng":147.31666666666666},{"olsonName":"Australia/Currie","lat":-39.93333333333333,"lng":143.86666666666667},{"olsonName":"Australia/Melbourne","lat":-37.81666666666667,"lng":144.96666666666667},{"olsonName":"Australia/Sydney","lat":-33.86666666666667,"lng":151.21666666666667},{"olsonName":"Australia/Broken_Hill","lat":-31.95,"lng":141.45},{"olsonName":"Australia/Brisbane","lat":-27.466666666666665,"lng":153.03333333333333},{"olsonName":"Australia/Lindeman","lat":-20.266666666666666,"lng":149},{"olsonName":"Australia/Adelaide","lat":-34.916666666666664,"lng":138.58333333333334},{"olsonName":"Australia/Darwin","lat":-12.466666666666667,"lng":130.83333333333334},{"olsonName":"Australia/Perth","lat":-31.95,"lng":115.85},{"olsonName":"Australia/Eucla","lat":-31.716666666666665,"lng":128.86666666666667},{"olsonName":"America/Aruba","lat":12.5,"lng":-69.96666666666667},{"olsonName":"Europe/Mariehamn","lat":60.1,"lng":19.95},{"olsonName":"Asia/Baku","lat":40.38333333333333,"lng":49.85},{"olsonName":"Europe/Sarajevo","lat":43.86666666666667,"lng":18.416666666666668},{"olsonName":"America/Barbados","lat":13.1,"lng":-59.61666666666667},{"olsonName":"Asia/Dhaka","lat":23.716666666666665,"lng":90.41666666666667},{"olsonName":"Europe/Brussels","lat":50.833333333333336,"lng":4.333333333333333},{"olsonName":"Africa/Ouagadougou","lat":12.366666666666667,"lng":-1.5166666666666666},{"olsonName":"Europe/Sofia","lat":42.68333333333333,"lng":23.316666666666666},{"olsonName":"Asia/Bahrain","lat":26.383333333333333,"lng":50.583333333333336},{"olsonName":"Africa/Bujumbura","lat":-3.3833333333333333,"lng":29.366666666666667},{"olsonName":"Africa/Porto-Novo","lat":6.483333333333333,"lng":2.6166666666666667},{"olsonName":"America/St_Barthelemy","lat":17.883333333333333,"lng":-62.85},{"olsonName":"Atlantic/Bermuda","lat":32.28333333333333,"lng":-64.76666666666667},{"olsonName":"Asia/Brunei","lat":4.933333333333334,"lng":114.91666666666667},{"olsonName":"America/La_Paz","lat":-16.5,"lng":-68.15},{"olsonName":"America/Kralendijk","lat":12.150833333333333,"lng":-68.27666666666667},{"olsonName":"America/Noronha","lat":-3.85,"lng":-32.416666666666664},{"olsonName":"America/Belem","lat":-1.45,"lng":-48.483333333333334},{"olsonName":"America/Fortaleza","lat":-3.716666666666667,"lng":-38.5},{"olsonName":"America/Recife","lat":-8.05,"lng":-34.9},{"olsonName":"America/Araguaina","lat":-7.2,"lng":-48.2},{"olsonName":"America/Maceio","lat":-9.666666666666666,"lng":-35.71666666666667},{"olsonName":"America/Bahia","lat":-12.983333333333333,"lng":-38.516666666666666},{"olsonName":"America/Sao_Paulo","lat":-23.533333333333335,"lng":-46.61666666666667},{"olsonName":"America/Campo_Grande","lat":-20.45,"lng":-54.61666666666667},{"olsonName":"America/Cuiaba","lat":-15.583333333333334,"lng":-56.083333333333336},{"olsonName":"America/Santarem","lat":-2.4333333333333336,"lng":-54.86666666666667},{"olsonName":"America/Porto_Velho","lat":-8.766666666666667,"lng":-63.9},{"olsonName":"America/Boa_Vista","lat":2.8166666666666664,"lng":-60.666666666666664},{"olsonName":"America/Manaus","lat":-3.1333333333333333,"lng":-60.016666666666666},{"olsonName":"America/Eirunepe","lat":-6.666666666666667,"lng":-69.86666666666666},{"olsonName":"America/Rio_Branco","lat":-9.966666666666667,"lng":-67.8},{"olsonName":"America/Nassau","lat":25.083333333333332,"lng":-77.35},{"olsonName":"Asia/Thimphu","lat":27.466666666666665,"lng":89.65},{"olsonName":"Africa/Gaborone","lat":-24.65,"lng":25.916666666666668},{"olsonName":"Europe/Minsk","lat":53.9,"lng":27.566666666666666},{"olsonName":"America/Belize","lat":17.5,"lng":-88.2},{"olsonName":"America/St_Johns","lat":47.56666666666667,"lng":-52.71666666666667},{"olsonName":"America/Halifax","lat":44.65,"lng":-63.6},{"olsonName":"America/Glace_Bay","lat":46.2,"lng":-59.95},{"olsonName":"America/Moncton","lat":46.1,"lng":-64.78333333333333},{"olsonName":"America/Goose_Bay","lat":53.333333333333336,"lng":-60.416666666666664},{"olsonName":"America/Blanc-Sablon","lat":51.416666666666664,"lng":-57.11666666666667},{"olsonName":"America/Montreal","lat":45.516666666666666,"lng":-73.56666666666666},{"olsonName":"America/Toronto","lat":43.65,"lng":-79.38333333333334},{"olsonName":"America/Nipigon","lat":49.016666666666666,"lng":-88.26666666666667},{"olsonName":"America/Thunder_Bay","lat":48.38333333333333,"lng":-89.25},{"olsonName":"America/Iqaluit","lat":63.733333333333334,"lng":-68.46666666666667},{"olsonName":"America/Pangnirtung","lat":66.13333333333334,"lng":-65.73333333333333},{"olsonName":"America/Resolute","lat":74.69555555555556,"lng":-94.82916666666667},{"olsonName":"America/Atikokan","lat":48.75861111111111,"lng":-91.62166666666666},{"olsonName":"America/Rankin_Inlet","lat":62.81666666666667,"lng":-92.08305555555555},{"olsonName":"America/Winnipeg","lat":49.88333333333333,"lng":-97.15},{"olsonName":"America/Rainy_River","lat":48.71666666666667,"lng":-94.56666666666666},{"olsonName":"America/Regina","lat":50.4,"lng":-104.65},{"olsonName":"America/Swift_Current","lat":50.28333333333333,"lng":-107.83333333333333},{"olsonName":"America/Edmonton","lat":53.55,"lng":-113.46666666666667},{"olsonName":"America/Cambridge_Bay","lat":69.11388888888888,"lng":-105.05277777777778},{"olsonName":"America/Yellowknife","lat":62.45,"lng":-114.35},{"olsonName":"America/Inuvik","lat":68.34972222222221,"lng":-133.71666666666667},{"olsonName":"America/Dawson_Creek","lat":59.766666666666666,"lng":-120.23333333333333},{"olsonName":"America/Vancouver","lat":49.266666666666666,"lng":-123.11666666666666},{"olsonName":"America/Whitehorse","lat":60.71666666666667,"lng":-135.05},{"olsonName":"America/Dawson","lat":64.06666666666666,"lng":-139.41666666666666},{"olsonName":"Indian/Cocos","lat":-12.166666666666666,"lng":96.91666666666667},{"olsonName":"Africa/Kinshasa","lat":-4.3,"lng":15.3},{"olsonName":"Africa/Lubumbashi","lat":-11.666666666666666,"lng":27.466666666666665},{"olsonName":"Africa/Bangui","lat":4.366666666666666,"lng":18.583333333333332},{"olsonName":"Africa/Brazzaville","lat":-4.266666666666667,"lng":15.283333333333333},{"olsonName":"Europe/Zurich","lat":47.38333333333333,"lng":8.533333333333333},{"olsonName":"Africa/Abidjan","lat":5.316666666666666,"lng":-4.033333333333333},{"olsonName":"Pacific/Rarotonga","lat":-21.233333333333334,"lng":-159.76666666666668},{"olsonName":"America/Santiago","lat":-33.45,"lng":-70.66666666666667},{"olsonName":"Pacific/Easter","lat":-27.15,"lng":-109.43333333333334},{"olsonName":"Africa/Douala","lat":4.05,"lng":9.7},{"olsonName":"Asia/Shanghai","lat":31.233333333333334,"lng":121.46666666666667},{"olsonName":"Asia/Harbin","lat":45.75,"lng":126.68333333333334},{"olsonName":"Asia/Chongqing","lat":29.566666666666666,"lng":106.58333333333333},{"olsonName":"Asia/Urumqi","lat":43.8,"lng":87.58333333333333},{"olsonName":"Asia/Kashgar","lat":39.483333333333334,"lng":75.98333333333333},{"olsonName":"America/Bogota","lat":4.6,"lng":-74.08333333333333},{"olsonName":"America/Costa_Rica","lat":9.933333333333334,"lng":-84.08333333333333},{"olsonName":"America/Havana","lat":23.133333333333333,"lng":-82.36666666666666},{"olsonName":"Atlantic/Cape_Verde","lat":14.916666666666666,"lng":-23.516666666666666},{"olsonName":"America/Curacao","lat":12.183333333333334,"lng":-69},{"olsonName":"Indian/Christmas","lat":-10.416666666666666,"lng":105.71666666666667},{"olsonName":"Asia/Nicosia","lat":35.166666666666664,"lng":33.36666666666667},{"olsonName":"Europe/Prague","lat":50.083333333333336,"lng":14.433333333333334},{"olsonName":"Europe/Berlin","lat":52.5,"lng":13.366666666666667},{"olsonName":"Africa/Djibouti","lat":11.6,"lng":43.15},{"olsonName":"Europe/Copenhagen","lat":55.666666666666664,"lng":12.583333333333334},{"olsonName":"America/Dominica","lat":15.3,"lng":-61.4},{"olsonName":"America/Santo_Domingo","lat":18.466666666666665,"lng":-69.9},{"olsonName":"Africa/Algiers","lat":36.78333333333333,"lng":3.05},{"olsonName":"America/Guayaquil","lat":-2.1666666666666665,"lng":-79.83333333333333},{"olsonName":"Pacific/Galapagos","lat":-0.9,"lng":-89.6},{"olsonName":"Europe/Tallinn","lat":59.416666666666664,"lng":24.75},{"olsonName":"Africa/Cairo","lat":30.05,"lng":31.25},{"olsonName":"Africa/El_Aaiun","lat":27.15,"lng":-13.2},{"olsonName":"Africa/Asmara","lat":15.333333333333334,"lng":38.88333333333333},{"olsonName":"Europe/Madrid","lat":40.4,"lng":-3.6833333333333336},{"olsonName":"Africa/Ceuta","lat":35.88333333333333,"lng":-5.316666666666666},{"olsonName":"Atlantic/Canary","lat":28.1,"lng":-15.4},{"olsonName":"Africa/Addis_Ababa","lat":9.033333333333333,"lng":38.7},{"olsonName":"Europe/Helsinki","lat":60.166666666666664,"lng":24.966666666666665},{"olsonName":"Pacific/Fiji","lat":-18.133333333333333,"lng":178.41666666666666},{"olsonName":"Atlantic/Stanley","lat":-51.7,"lng":-57.85},{"olsonName":"Pacific/Chuuk","lat":7.416666666666667,"lng":151.78333333333333},{"olsonName":"Pacific/Pohnpei","lat":6.966666666666667,"lng":158.21666666666667},{"olsonName":"Pacific/Kosrae","lat":5.316666666666666,"lng":162.98333333333332},{"olsonName":"Atlantic/Faroe","lat":62.016666666666666,"lng":-6.766666666666667},{"olsonName":"Europe/Paris","lat":48.86666666666667,"lng":2.3333333333333335},{"olsonName":"Africa/Libreville","lat":0.38333333333333336,"lng":9.45},{"olsonName":"Europe/London","lat":51.50833333333333,"lng":-0.12527777777777777},{"olsonName":"America/Grenada","lat":12.05,"lng":-61.75},{"olsonName":"Asia/Tbilisi","lat":41.71666666666667,"lng":44.81666666666667},{"olsonName":"America/Cayenne","lat":4.933333333333334,"lng":-52.333333333333336},{"olsonName":"Europe/Guernsey","lat":49.45,"lng":-2.533333333333333},{"olsonName":"Africa/Accra","lat":5.55,"lng":-0.21666666666666667},{"olsonName":"Europe/Gibraltar","lat":36.13333333333333,"lng":-5.35},{"olsonName":"America/Godthab","lat":64.18333333333334,"lng":-51.733333333333334},{"olsonName":"America/Danmarkshavn","lat":76.76666666666667,"lng":-18.666666666666668},{"olsonName":"America/Scoresbysund","lat":70.48333333333333,"lng":-21.966666666666665},{"olsonName":"America/Thule","lat":76.56666666666666,"lng":-68.78333333333333},{"olsonName":"Africa/Banjul","lat":13.466666666666667,"lng":-16.65},{"olsonName":"Africa/Conakry","lat":9.516666666666667,"lng":-13.716666666666667},{"olsonName":"America/Guadeloupe","lat":16.233333333333334,"lng":-61.53333333333333},{"olsonName":"Africa/Malabo","lat":3.75,"lng":8.783333333333333},{"olsonName":"Europe/Athens","lat":37.96666666666667,"lng":23.716666666666665},{"olsonName":"Atlantic/South_Georgia","lat":-54.266666666666666,"lng":-36.53333333333333},{"olsonName":"America/Guatemala","lat":14.633333333333333,"lng":-90.51666666666667},{"olsonName":"Pacific/Guam","lat":13.466666666666667,"lng":144.75},{"olsonName":"Africa/Bissau","lat":11.85,"lng":-15.583333333333334},{"olsonName":"America/Guyana","lat":6.8,"lng":-58.166666666666664},{"olsonName":"Asia/Hong_Kong","lat":22.283333333333335,"lng":114.15},{"olsonName":"America/Tegucigalpa","lat":14.1,"lng":-87.21666666666667},{"olsonName":"Europe/Zagreb","lat":45.8,"lng":15.966666666666667},{"olsonName":"America/Port-au-Prince","lat":18.533333333333335,"lng":-72.33333333333333},{"olsonName":"Europe/Budapest","lat":47.5,"lng":19.083333333333332},{"olsonName":"Asia/Jakarta","lat":-6.166666666666667,"lng":106.8},{"olsonName":"Asia/Pontianak","lat":-0.03333333333333333,"lng":109.33333333333333},{"olsonName":"Asia/Makassar","lat":-5.116666666666666,"lng":119.4},{"olsonName":"Asia/Jayapura","lat":-2.533333333333333,"lng":140.7},{"olsonName":"Europe/Dublin","lat":53.333333333333336,"lng":-6.25},{"olsonName":"Asia/Jerusalem","lat":31.766666666666666,"lng":35.233333333333334},{"olsonName":"Europe/Isle_of_Man","lat":54.15,"lng":-4.466666666666667},{"olsonName":"Asia/Kolkata","lat":22.533333333333335,"lng":88.36666666666666},{"olsonName":"Indian/Chagos","lat":-7.333333333333333,"lng":72.41666666666667},{"olsonName":"Asia/Baghdad","lat":33.35,"lng":44.416666666666664},{"olsonName":"Asia/Tehran","lat":35.666666666666664,"lng":51.43333333333333},{"olsonName":"Atlantic/Reykjavik","lat":64.15,"lng":-21.85},{"olsonName":"Europe/Rome","lat":41.9,"lng":12.483333333333333},{"olsonName":"Europe/Jersey","lat":49.2,"lng":-2.1166666666666667},{"olsonName":"America/Jamaica","lat":18,"lng":-76.8},{"olsonName":"Asia/Amman","lat":31.95,"lng":35.93333333333333},{"olsonName":"Asia/Tokyo","lat":35.654444444444444,"lng":139.7447222222222},{"olsonName":"Africa/Nairobi","lat":-1.2833333333333332,"lng":36.81666666666667},{"olsonName":"Asia/Bishkek","lat":42.9,"lng":74.6},{"olsonName":"Asia/Phnom_Penh","lat":11.55,"lng":104.91666666666667},{"olsonName":"Pacific/Tarawa","lat":1.4166666666666667,"lng":173},{"olsonName":"Pacific/Enderbury","lat":-3.1333333333333333,"lng":-171.08333333333334},{"olsonName":"Pacific/Kiritimati","lat":1.8666666666666667,"lng":-157.33333333333334},{"olsonName":"Indian/Comoro","lat":-11.683333333333334,"lng":43.266666666666666},{"olsonName":"America/St_Kitts","lat":17.3,"lng":-62.71666666666667},{"olsonName":"Asia/Pyongyang","lat":39.016666666666666,"lng":125.75},{"olsonName":"Asia/Seoul","lat":37.55,"lng":126.96666666666667},{"olsonName":"Asia/Kuwait","lat":29.333333333333332,"lng":47.983333333333334},{"olsonName":"America/Cayman","lat":19.3,"lng":-81.38333333333334},{"olsonName":"Asia/Almaty","lat":43.25,"lng":76.95},{"olsonName":"Asia/Qyzylorda","lat":44.8,"lng":65.46666666666667},{"olsonName":"Asia/Aqtobe","lat":50.28333333333333,"lng":57.166666666666664},{"olsonName":"Asia/Aqtau","lat":44.516666666666666,"lng":50.266666666666666},{"olsonName":"Asia/Oral","lat":51.21666666666667,"lng":51.35},{"olsonName":"Asia/Vientiane","lat":17.966666666666665,"lng":102.6},{"olsonName":"Asia/Beirut","lat":33.88333333333333,"lng":35.5},{"olsonName":"America/St_Lucia","lat":14.016666666666667,"lng":-61},{"olsonName":"Europe/Vaduz","lat":47.15,"lng":9.516666666666667},{"olsonName":"Asia/Colombo","lat":6.933333333333334,"lng":79.85},{"olsonName":"Africa/Monrovia","lat":6.3,"lng":-10.783333333333333},{"olsonName":"Africa/Maseru","lat":-29.466666666666665,"lng":27.5},{"olsonName":"Europe/Vilnius","lat":54.68333333333333,"lng":25.316666666666666},{"olsonName":"Europe/Luxembourg","lat":49.6,"lng":6.15},{"olsonName":"Europe/Riga","lat":56.95,"lng":24.1},{"olsonName":"Africa/Tripoli","lat":32.9,"lng":13.183333333333334},{"olsonName":"Africa/Casablanca","lat":33.65,"lng":-7.583333333333333},{"olsonName":"Europe/Monaco","lat":43.7,"lng":7.383333333333334},{"olsonName":"Europe/Chisinau","lat":47,"lng":28.833333333333332},{"olsonName":"Europe/Podgorica","lat":42.43333333333333,"lng":19.266666666666666},{"olsonName":"America/Marigot","lat":18.066666666666666,"lng":-63.083333333333336},{"olsonName":"Indian/Antananarivo","lat":-18.916666666666668,"lng":47.516666666666666},{"olsonName":"Pacific/Majuro","lat":7.15,"lng":171.2},{"olsonName":"Pacific/Kwajalein","lat":9.083333333333334,"lng":167.33333333333334},{"olsonName":"Europe/Skopje","lat":41.983333333333334,"lng":21.433333333333334},{"olsonName":"Africa/Bamako","lat":12.65,"lng":-8},{"olsonName":"Asia/Rangoon","lat":16.783333333333335,"lng":96.16666666666667},{"olsonName":"Asia/Ulaanbaatar","lat":47.916666666666664,"lng":106.88333333333334},{"olsonName":"Asia/Hovd","lat":48.016666666666666,"lng":91.65},{"olsonName":"Asia/Choibalsan","lat":48.06666666666667,"lng":114.5},{"olsonName":"Asia/Macau","lat":22.233333333333334,"lng":113.58333333333333},{"olsonName":"Pacific/Saipan","lat":15.2,"lng":145.75},{"olsonName":"America/Martinique","lat":14.6,"lng":-61.083333333333336},{"olsonName":"Africa/Nouakchott","lat":18.1,"lng":-15.95},{"olsonName":"America/Montserrat","lat":16.716666666666665,"lng":-62.21666666666667},{"olsonName":"Europe/Malta","lat":35.9,"lng":14.516666666666667},{"olsonName":"Indian/Mauritius","lat":-20.166666666666668,"lng":57.5},{"olsonName":"Indian/Maldives","lat":4.166666666666667,"lng":73.5},{"olsonName":"Africa/Blantyre","lat":-15.783333333333333,"lng":35},{"olsonName":"America/Mexico_City","lat":19.4,"lng":-99.15},{"olsonName":"America/Cancun","lat":21.083333333333332,"lng":-86.76666666666667},{"olsonName":"America/Merida","lat":20.966666666666665,"lng":-89.61666666666666},{"olsonName":"America/Monterrey","lat":25.666666666666668,"lng":-100.31666666666666},{"olsonName":"America/Matamoros","lat":25.833333333333332,"lng":-97.5},{"olsonName":"America/Mazatlan","lat":23.216666666666665,"lng":-106.41666666666667},{"olsonName":"America/Chihuahua","lat":28.633333333333333,"lng":-106.08333333333333},{"olsonName":"America/Ojinaga","lat":29.566666666666666,"lng":-104.41666666666667},{"olsonName":"America/Hermosillo","lat":29.066666666666666,"lng":-110.96666666666667},{"olsonName":"America/Tijuana","lat":32.53333333333333,"lng":-117.01666666666667},{"olsonName":"America/Santa_Isabel","lat":30.3,"lng":-114.86666666666666},{"olsonName":"America/Bahia_Banderas","lat":20.8,"lng":-105.25},{"olsonName":"Asia/Kuala_Lumpur","lat":3.1666666666666665,"lng":101.7},{"olsonName":"Asia/Kuching","lat":1.55,"lng":110.33333333333333},{"olsonName":"Africa/Maputo","lat":-25.966666666666665,"lng":32.583333333333336},{"olsonName":"Africa/Windhoek","lat":-22.566666666666666,"lng":17.1},{"olsonName":"Pacific/Noumea","lat":-22.266666666666666,"lng":166.45},{"olsonName":"Africa/Niamey","lat":13.516666666666667,"lng":2.1166666666666667},{"olsonName":"Pacific/Norfolk","lat":-29.05,"lng":167.96666666666667},{"olsonName":"Africa/Lagos","lat":6.45,"lng":3.4},{"olsonName":"America/Managua","lat":12.15,"lng":-86.28333333333333},{"olsonName":"Europe/Amsterdam","lat":52.36666666666667,"lng":4.9},{"olsonName":"Europe/Oslo","lat":59.916666666666664,"lng":10.75},{"olsonName":"Asia/Kathmandu","lat":27.716666666666665,"lng":85.31666666666666},{"olsonName":"Pacific/Nauru","lat":-0.5166666666666667,"lng":166.91666666666666},{"olsonName":"Pacific/Niue","lat":-19.016666666666666,"lng":-169.91666666666666},{"olsonName":"Pacific/Auckland","lat":-36.86666666666667,"lng":174.76666666666668},{"olsonName":"Pacific/Chatham","lat":-43.95,"lng":-176.55},{"olsonName":"Asia/Muscat","lat":23.6,"lng":58.583333333333336},{"olsonName":"America/Panama","lat":8.966666666666667,"lng":-79.53333333333333},{"olsonName":"America/Lima","lat":-12.05,"lng":-77.05},{"olsonName":"Pacific/Tahiti","lat":-17.533333333333335,"lng":-149.56666666666666},{"olsonName":"Pacific/Marquesas","lat":-9,"lng":-139.5},{"olsonName":"Pacific/Gambier","lat":-23.133333333333333,"lng":-134.95},{"olsonName":"Pacific/Port_Moresby","lat":-9.5,"lng":147.16666666666666},{"olsonName":"Asia/Manila","lat":14.583333333333334,"lng":121},{"olsonName":"Asia/Karachi","lat":24.866666666666667,"lng":67.05},{"olsonName":"Europe/Warsaw","lat":52.25,"lng":21},{"olsonName":"America/Miquelon","lat":47.05,"lng":-56.333333333333336},{"olsonName":"Pacific/Pitcairn","lat":-25.066666666666666,"lng":-130.08333333333334},{"olsonName":"America/Puerto_Rico","lat":18.46833333333333,"lng":-66.1061111111111},{"olsonName":"Asia/Gaza","lat":31.5,"lng":34.46666666666667},{"olsonName":"Asia/Hebron","lat":31.533333333333335,"lng":35.095},{"olsonName":"Europe/Lisbon","lat":38.71666666666667,"lng":-9.133333333333333},{"olsonName":"Atlantic/Madeira","lat":32.63333333333333,"lng":-16.9},{"olsonName":"Atlantic/Azores","lat":37.733333333333334,"lng":-25.666666666666668},{"olsonName":"Pacific/Palau","lat":7.333333333333333,"lng":134.48333333333332},{"olsonName":"America/Asuncion","lat":-25.266666666666666,"lng":-57.666666666666664},{"olsonName":"Asia/Qatar","lat":25.283333333333335,"lng":51.53333333333333},{"olsonName":"Indian/Reunion","lat":-20.866666666666667,"lng":55.46666666666667},{"olsonName":"Europe/Bucharest","lat":44.43333333333333,"lng":26.1},{"olsonName":"Europe/Belgrade","lat":44.833333333333336,"lng":20.5},{"olsonName":"Europe/Kaliningrad","lat":54.71666666666667,"lng":20.5},{"olsonName":"Europe/Moscow","lat":55.75,"lng":37.583333333333336},{"olsonName":"Europe/Volgograd","lat":48.733333333333334,"lng":44.416666666666664},{"olsonName":"Europe/Samara","lat":53.2,"lng":50.15},{"olsonName":"Asia/Yekaterinburg","lat":56.85,"lng":60.6},{"olsonName":"Asia/Omsk","lat":55,"lng":73.4},{"olsonName":"Asia/Novosibirsk","lat":55.03333333333333,"lng":82.91666666666667},{"olsonName":"Asia/Novokuznetsk","lat":53.75,"lng":87.11666666666666},{"olsonName":"Asia/Krasnoyarsk","lat":56.016666666666666,"lng":92.83333333333333},{"olsonName":"Asia/Irkutsk","lat":52.266666666666666,"lng":104.33333333333333},{"olsonName":"Asia/Yakutsk","lat":62,"lng":129.66666666666666},{"olsonName":"Asia/Vladivostok","lat":43.166666666666664,"lng":131.93333333333334},{"olsonName":"Asia/Sakhalin","lat":46.96666666666667,"lng":142.7},{"olsonName":"Asia/Magadan","lat":59.56666666666667,"lng":150.8},{"olsonName":"Asia/Kamchatka","lat":53.016666666666666,"lng":158.65},{"olsonName":"Asia/Anadyr","lat":64.75,"lng":177.48333333333332},{"olsonName":"Africa/Kigali","lat":-1.95,"lng":30.066666666666666},{"olsonName":"Asia/Riyadh","lat":24.633333333333333,"lng":46.71666666666667},{"olsonName":"Pacific/Guadalcanal","lat":-9.533333333333333,"lng":160.2},{"olsonName":"Indian/Mahe","lat":-4.666666666666667,"lng":55.46666666666667},{"olsonName":"Africa/Khartoum","lat":15.6,"lng":32.53333333333333},{"olsonName":"Europe/Stockholm","lat":59.333333333333336,"lng":18.05},{"olsonName":"Asia/Singapore","lat":1.2833333333333332,"lng":103.85},{"olsonName":"Atlantic/St_Helena","lat":-15.916666666666666,"lng":-5.7},{"olsonName":"Europe/Ljubljana","lat":46.05,"lng":14.516666666666667},{"olsonName":"Arctic/Longyearbyen","lat":78,"lng":16},{"olsonName":"Europe/Bratislava","lat":48.15,"lng":17.116666666666667},{"olsonName":"Africa/Freetown","lat":8.5,"lng":-13.25},{"olsonName":"Europe/San_Marino","lat":43.916666666666664,"lng":12.466666666666667},{"olsonName":"Africa/Dakar","lat":14.666666666666666,"lng":-17.433333333333334},{"olsonName":"Africa/Mogadishu","lat":2.066666666666667,"lng":45.36666666666667},{"olsonName":"America/Paramaribo","lat":5.833333333333333,"lng":-55.166666666666664},{"olsonName":"Africa/Juba","lat":4.85,"lng":31.6},{"olsonName":"Africa/Sao_Tome","lat":0.3333333333333333,"lng":6.733333333333333},{"olsonName":"America/El_Salvador","lat":13.7,"lng":-89.2},{"olsonName":"America/Lower_Princes","lat":18.05138888888889,"lng":-63.04722222222222},{"olsonName":"Asia/Damascus","lat":33.5,"lng":36.3},{"olsonName":"Africa/Mbabane","lat":-26.3,"lng":31.1},{"olsonName":"America/Grand_Turk","lat":21.466666666666665,"lng":-71.13333333333334},{"olsonName":"Africa/Ndjamena","lat":12.116666666666667,"lng":15.05},{"olsonName":"Indian/Kerguelen","lat":-49.35277777777778,"lng":70.2175},{"olsonName":"Africa/Lome","lat":6.133333333333334,"lng":1.2166666666666668},{"olsonName":"Asia/Bangkok","lat":13.75,"lng":100.51666666666667},{"olsonName":"Asia/Dushanbe","lat":38.583333333333336,"lng":68.8},{"olsonName":"Pacific/Fakaofo","lat":-9.366666666666667,"lng":-171.23333333333332},{"olsonName":"Asia/Dili","lat":-8.55,"lng":125.58333333333333},{"olsonName":"Asia/Ashgabat","lat":37.95,"lng":58.38333333333333},{"olsonName":"Africa/Tunis","lat":36.8,"lng":10.183333333333334},{"olsonName":"Pacific/Tongatapu","lat":-21.166666666666668,"lng":-175.16666666666666},{"olsonName":"Europe/Istanbul","lat":41.016666666666666,"lng":28.966666666666665},{"olsonName":"America/Port_of_Spain","lat":10.65,"lng":-61.516666666666666},{"olsonName":"Pacific/Funafuti","lat":-8.516666666666667,"lng":179.21666666666667},{"olsonName":"Asia/Taipei","lat":25.05,"lng":121.5},{"olsonName":"Africa/Dar_es_Salaam","lat":-6.8,"lng":39.28333333333333},{"olsonName":"Europe/Kiev","lat":50.43333333333333,"lng":30.516666666666666},{"olsonName":"Europe/Uzhgorod","lat":48.61666666666667,"lng":22.3},{"olsonName":"Europe/Zaporozhye","lat":47.833333333333336,"lng":35.166666666666664},{"olsonName":"Europe/Simferopol","lat":44.95,"lng":34.1},{"olsonName":"Africa/Kampala","lat":0.31666666666666665,"lng":32.416666666666664},{"olsonName":"Pacific/Johnston","lat":16.75,"lng":-169.51666666666668},{"olsonName":"Pacific/Midway","lat":28.216666666666665,"lng":-177.36666666666667},{"olsonName":"Pacific/Wake","lat":19.283333333333335,"lng":166.61666666666667},{"olsonName":"America/New_York","lat":40.71416666666667,"lng":-74.00638888888889},{"olsonName":"America/Detroit","lat":42.331388888888895,"lng":-83.04583333333333},{"olsonName":"America/Kentucky/Louisville","lat":38.25416666666667,"lng":-85.75944444444444},{"olsonName":"America/Kentucky/Monticello","lat":36.82972222222222,"lng":-84.84916666666666},{"olsonName":"America/Indiana/Indianapolis","lat":39.76833333333333,"lng":-86.15805555555556},{"olsonName":"America/Indiana/Vincennes","lat":38.67722222222222,"lng":-87.5286111111111},{"olsonName":"America/Indiana/Winamac","lat":41.05138888888889,"lng":-86.60305555555556},{"olsonName":"America/Indiana/Marengo","lat":38.37555555555556,"lng":-86.34472222222222},{"olsonName":"America/Indiana/Petersburg","lat":38.49194444444444,"lng":-87.2786111111111},{"olsonName":"America/Indiana/Vevay","lat":38.74777777777778,"lng":-85.06722222222221},{"olsonName":"America/Chicago","lat":41.85,"lng":-87.65},{"olsonName":"America/Indiana/Tell_City","lat":37.95305555555556,"lng":-86.76138888888889},{"olsonName":"America/Indiana/Knox","lat":41.295833333333334,"lng":-86.625},{"olsonName":"America/Menominee","lat":45.10777777777778,"lng":-87.61416666666666},{"olsonName":"America/North_Dakota/Center","lat":47.11638888888889,"lng":-101.29916666666666},{"olsonName":"America/North_Dakota/New_Salem","lat":46.845,"lng":-101.41083333333334},{"olsonName":"America/North_Dakota/Beulah","lat":47.26416666666667,"lng":-101.77777777777777},{"olsonName":"America/Denver","lat":39.73916666666667,"lng":-104.98416666666667},{"olsonName":"America/Boise","lat":43.61361111111111,"lng":-116.2025},{"olsonName":"America/Shiprock","lat":36.785555555555554,"lng":-108.6863888888889},{"olsonName":"America/Phoenix","lat":33.44833333333333,"lng":-112.07333333333332},{"olsonName":"America/Los_Angeles","lat":34.05222222222222,"lng":-118.24277777777777},{"olsonName":"America/Anchorage","lat":61.21805555555556,"lng":-149.90027777777777},{"olsonName":"America/Juneau","lat":58.301944444444445,"lng":-134.41972222222222},{"olsonName":"America/Sitka","lat":57.17638888888889,"lng":-135.30194444444444},{"olsonName":"America/Yakutat","lat":59.54694444444444,"lng":-139.72722222222222},{"olsonName":"America/Nome","lat":64.50111111111111,"lng":-165.4063888888889},{"olsonName":"America/Adak","lat":51.88,"lng":-176.65805555555556},{"olsonName":"America/Metlakatla","lat":55.12694444444445,"lng":-131.57638888888889},{"olsonName":"Pacific/Honolulu","lat":21.306944444444444,"lng":-157.85833333333332},{"olsonName":"America/Montevideo","lat":-34.88333333333333,"lng":-56.18333333333333},{"olsonName":"Asia/Samarkand","lat":39.666666666666664,"lng":66.8},{"olsonName":"Asia/Tashkent","lat":41.333333333333336,"lng":69.3},{"olsonName":"Europe/Vatican","lat":41.90222222222222,"lng":12.453055555555554},{"olsonName":"America/St_Vincent","lat":13.15,"lng":-61.233333333333334},{"olsonName":"America/Caracas","lat":10.5,"lng":-66.93333333333334},{"olsonName":"America/Tortola","lat":18.45,"lng":-64.61666666666666},{"olsonName":"America/St_Thomas","lat":18.35,"lng":-64.93333333333334},{"olsonName":"Asia/Ho_Chi_Minh","lat":10.75,"lng":106.66666666666667},{"olsonName":"Pacific/Efate","lat":-17.666666666666668,"lng":168.41666666666666},{"olsonName":"Pacific/Wallis","lat":-13.3,"lng":-176.16666666666666},{"olsonName":"Pacific/Apia","lat":-13.833333333333334,"lng":-171.73333333333332},{"olsonName":"Asia/Aden","lat":12.75,"lng":45.2},{"olsonName":"Indian/Mayotte","lat":-12.783333333333333,"lng":45.233333333333334},{"olsonName":"Africa/Johannesburg","lat":-26.25,"lng":28},{"olsonName":"Africa/Lusaka","lat":-15.416666666666666,"lng":28.283333333333335},{"olsonName":"Africa/Harare","lat":-17.833333333333332,"lng":31.05}]');
-  var DEFAULT_DOT = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAApQAAAKUBcMTeVQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABgSURBVBiVhc8hCsUwFETRQ91ThejsPFuozwq6m0IhOuV9U/GpycCoC5cZmQm10IMRjEJHfZm6czXmTd5kY+5cqAq9MZP8b2MWumDcH5ivKRibRbbgPHi+4OAJzvXI1c0fE9JFWWHz6IkAAAAASUVORK5CYII=";
 
 })(jQuery);
