@@ -29,12 +29,6 @@
       return;
     }
 
-    $.get(_options.jsonRootUrl + 'transitions/' + name + '.json',
-    function(data) {
-      _transitions[name] = typeof data === 'string' ? JSON.parse(data) :
-        data;
-    });
-
     $.get(_options.jsonRootUrl + 'polygons/' + name + '.json', function(data) {
       data = typeof data === 'string' ? JSON.parse(data) : data;
 
@@ -43,8 +37,10 @@
       var maxPoints = 0;
       var centroid;
       _mapZones[name] = [];
+      _transitions[name] = data.transitions;
+
       $.each(data.polygons, function(i, polygon) {
-        // Ray casting counters for hit testing.
+        // Ray casting counter for hit testing.
         var rayTest = 0;
         var lastPoint = polygon.points[polygon.points.length - 1];
 
@@ -70,7 +66,7 @@
         // If the count is odd, we are in the polygon
         inZone |= (rayTest % 2 === 1);
 
-        // Hack to get the centroid of the largest area polygon - we just check
+        // Hack to get the centroid of the largest polygon - we just check
         // which has the most edges
         if (polygon.points.length > maxPoints) {
           centroid = polygon.centroid;
@@ -100,7 +96,7 @@
         var id = slugifyName(data.name);
 
         // Figure out the UTC offset
-        var transitions = _transitions[name].transitions;
+        var transitions = _transitions[name];
         var now = new Date().getTime();
         var utcOffset = 0;
         var tzName = '';

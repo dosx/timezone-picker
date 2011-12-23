@@ -10,7 +10,7 @@ import sys
 
 def simplify(points):
     polygon = Polygon(map(lambda x: (x["x"], x["y"]), points))
-    polygon = polygon.simplify(0.025)
+    polygon = polygon.simplify(0.05)
     return {
         "points": map(lambda x: {"x": x[0], "y": x[1]},
             polygon.exterior.coords),
@@ -85,7 +85,6 @@ if __name__ == '__main__':
 
     output_dir = sys.argv[2]
     os.mkdir(os.path.join(output_dir, "polygons"))
-    os.mkdir(os.path.join(output_dir, "transitions"))
     for name, zone in zones.iteritems():
         boxes.append({
             "name": name,
@@ -97,12 +96,7 @@ if __name__ == '__main__':
         open(out_file, "w").write(
             simplejson.dumps({
                 "name": name,
-                "polygons": zone["polygons"]
-            }))
-        out_file = os.path.join(output_dir, "transitions", "%s.json" % filename)
-        open(out_file, "w").write(
-            simplejson.dumps({
-                "name": name,
+                "polygons": zone["polygons"],
                 "transitions": zone["transitions"]
             }))
 
