@@ -24,15 +24,15 @@
       onSelected: function(zone) {
         alert('Timezone Selected: ' + zone);
       },
-      onInfoWindow: function(olsonName, utcOffset) {
+      onInfoWindow: function(olsonName, utcOffset, tzName) {
         var now = new Date();
         var delta = now.setHours(now.getHours() +
           (now.getTimezoneOffset() + utcOffset / 60) / 60);
-        return '<h1>' + olsonName + ' ' +
+        return '<h1>' + olsonName + '<br/>' +
           pad(now.getHours()) + ':' +
           pad(now.getMinutes()) + ':' +
-          pad(now.getSeconds()) +
-          ' [' + (utcOffset / 60 / 60) + ']'
+          pad(now.getSeconds()) + '<br/>' +
+          '[' + tzName + ' ' + (utcOffset / 60 / 60) + ']'
           '</h1>';
       }
     });

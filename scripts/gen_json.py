@@ -49,14 +49,16 @@ def collate_zones(shape_file):
                 td = timezone.utcoffset(datetime.datetime(2000, 1, 1))
                 zones[name]["transitions"] = [{
                     "time": 0,
-                    "utc_offset": timedelta_to_seconds(td)
+                    "utc_offset": timedelta_to_seconds(td),
+                    "tzname": timezone.tzname(datetime.datetime(2000, 1, 1))
                 }]
                 continue
             for i, transition_time in enumerate(timezone._utc_transition_times):
                 td = timezone._transition_info[i][0]
                 transition_info.append({
                     "time": time.mktime(transition_time.timetuple()),
-                    "utc_offset": timedelta_to_seconds(td)
+                    "utc_offset": timedelta_to_seconds(td),
+                    "tzname": timezone._transition_info[i][2]
                 })
 
             zones[name]["transitions"] = transition_info

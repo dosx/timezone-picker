@@ -15,8 +15,9 @@
     _mapZones = {};
   };
 
-  var onInfoWindow = function(olsonName, utcOffset) {
-    return '<h1>' + olsonName + ' [' + (utcOffset / 60 / 60) + ']</h1>';
+  var onInfoWindow = function(olsonName, utcOffset, tzName) {
+    return '<h1>' + olsonName + '<br/>[' + tzName + ':' +
+      (utcOffset / 60 / 60) + ']</h1>';
   };
 
   var slugifyName = function(name) {
@@ -102,15 +103,17 @@
         var transitions = _transitions[name].transitions;
         var now = new Date().getTime();
         var utcOffset = 0;
+        var tzName = '';
         $.each(transitions, function(i, transition) {
           if (transition.time < now) {
             utcOffset = transition.utc_offset;
+            tzName = transition.tzname;
           }
         });
 
         var infowindow = new google.maps.InfoWindow({
           content: '<div id="' + id + '" class="timezone-picker-infowindow">' +
-            _options.onInfoWindow(data.name, utcOffset) +
+            _options.onInfoWindow(data.name, utcOffset, tzName) +
             '<div class="timezone-picker-buttons">' +
             '<button>Use Timezone</button><button>Cancel</button>' +
             '</div>' +
