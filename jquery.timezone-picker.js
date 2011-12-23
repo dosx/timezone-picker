@@ -4,6 +4,8 @@
   var _boundingBoxes;
   var _map;
   var _mapZones = {};
+  var _hoverPolygons = [];
+  var _currentHoverRegion
   var _transitions;
 
   var _loader;
@@ -101,6 +103,52 @@
     return name.toLowerCase().replace(/[^a-z0-9]/g, '_');
   };
 
+  var hitTestAndConvert = function(polygons, lat, lng) {
+    var allPolygons = [];
+    var inZone = false;
+    var selectedPolygon;
+    $.each(polygons, function(i, polygon) {
+      // Ray casting counter for hit testing.
+      var rayTest = 0;
+      var lastPoint = polygon.points[polygon.points.length - 1];
+
+      var coords = [];
+      $.each(polygon.points, function(j, point) {
+        coords.push(new google.maps.LatLng(point.y, point.x));
+
+        // Ray casting test
+        if ((lastPoint.y <= lat && point.y >= lat) ||
+          (lastPoint.y > lat && point.y < lat)) {
+          var slope = (point.x - lastPoint.x) / (point.y - lastPoint.y);
+          var testPoint = slope * (lat - lastPoint.y) + lastPoint.x;
+          if (testPoint < lng) {
+            rayTest++;
+          }
+        }
+
+        lastPoint = point;
+      });
+
+      allPolygons.push({
+        polygon: polygon,
+        coords: coords
+      });
+
+      // If the count is odd, we are in the polygon
+      var odd = (rayTest % 2 === 1);
+      inZone |= odd;
+      if (odd) {
+        selectedPolygon = polygon;
+      }
+    });
+
+    return {
+      allPolygons: allPolygons,
+      inZone: inZone,
+      selectedPolygon: selectedPolygon
+    };
+  };
+
   var drawZone = function(name, lat, lng) {
     if (_mapZones[name]) {
       return;
@@ -115,49 +163,13 @@
 
       data = typeof data === 'string' ? JSON.parse(data) : data;
 
-      var inZone = false;
-      var allPolygons = [];
-      var selectedPolygon;
       _mapZones[name] = [];
       _transitions = data.transitions;
 
-      $.each(data.polygons, function(i, polygon) {
-        // Ray casting counter for hit testing.
-        var rayTest = 0;
-        var lastPoint = polygon.points[polygon.points.length - 1];
+      var result = hitTestAndConvert(data.polygons, lat, lng);
 
-        var coords = [];
-        $.each(polygon.points, function(j, point) {
-          coords.push(new google.maps.LatLng(point.y, point.x));
-
-          // Ray casting test
-          if ((lastPoint.y <= lat && point.y >= lat) ||
-            (lastPoint.y > lat && point.y < lat)) {
-            var slope = (point.x - lastPoint.x) / (point.y - lastPoint.y);
-            var testPoint = slope * (lat - lastPoint.y) + lastPoint.x;
-            if (testPoint < lng) {
-              rayTest++;
-            }
-          }
-
-          lastPoint = point;
-        });
-
-        allPolygons.push({
-          polygon: polygon,
-          coords: coords
-        });
-
-        // If the count is odd, we are in the polygon
-        var odd = (rayTest % 2 === 1);
-        inZone |= odd;
-        if (odd) {
-          selectedPolygon = polygon;
-        }
-      });
-
-      if (inZone) {
-        $.each(allPolygons, function(i, polygonInfo) {
+      if (result.inZone) {
+        $.each(result.allPolygons, function(i, polygonInfo) {
           var mapPolygon = new google.maps.Polygon({
             paths: polygonInfo.coords,
             strokeColor: '#ff0000',
@@ -175,7 +187,7 @@
           _mapZones[name].push(mapPolygon);
         });
 
-        showInfoWindow(selectedPolygon);
+        showInfoWindow(result.selectedPolygon);
       }
     });
   };
@@ -206,6 +218,40 @@
 
       $.get(_options.jsonRootUrl + 'bounding_boxes.json', function(data) {
         _boundingBoxes = typeof data === 'string' ? JSON.parse(data) : data;
+      });
+
+      google.maps.event.addListener(_map, 'mousemove', function(e) {
+        var lat = e.latLng.Qa;
+        var lng = e.latLng.Ra;
+
+        $.each(_boundingBoxes, function(i, v) {
+          var bb = v.boundingBox;
+          if (lat > bb.ymin && lat < bb.ymax && lng > bb.xmin && lng < bb.xmax) {
+            var result = hitTestAndConvert(v.hoverRegion, lat, lng);
+            if (result.inZone && v.name !== _currentHoverRegion) {
+              $.each(_hoverPolygons, function(i, p) {
+                p.setMap(null);
+              });
+
+              _hoverPolygons = [];
+              _currentHoverRegion = v.name;
+
+              $.each(result.allPolygons, function(i, polygonInfo) {
+                var mapPolygon = new google.maps.Polygon({
+                  paths: polygonInfo.coords,
+                  strokeColor: '#444444',
+                  strokeOpacity: 0.7,
+                  strokeWeight: 1,
+                  fillColor: '#888888',
+                  fillOpacity: 0.5
+                });
+                mapPolygon.setMap(_map);
+
+                _hoverPolygons.push(mapPolygon);
+              });
+            }
+          }
+        });
       });
 
       google.maps.event.addListener(_map, 'click', function(e) {

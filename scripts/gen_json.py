@@ -5,13 +5,13 @@ import pytz
 import shpUtils
 import simplejson
 from shapely.geometry import Polygon
+from shapely.ops import cascaded_union
 import time
 import sys
 
 def simplify(points):
     polygon = Polygon(map(lambda x: (x["x"], x["y"]), points))
     polygon = polygon.simplify(0.05)
-
     return {
         "points": map(lambda x: {"x": x[0], "y": x[1]},
             polygon.exterior.coords),
@@ -90,6 +90,9 @@ def collate_zones(shape_file):
         shp_data = row["shp_data"]
         for part in shp_data["parts"]:
             polygonInfo = simplify(part["points"])
+            if polygonInfo is None:
+                continue
+
             polygonInfo["name"] = name
             zones[collation_key]["polygons"].append(polygonInfo)
 
@@ -112,9 +115,26 @@ if __name__ == '__main__':
     output_dir = sys.argv[2]
     os.mkdir(os.path.join(output_dir, "polygons"))
     for key, zone in zones.iteritems():
+        # calculate a hover region
+        polygons = []
+        for p in zone["polygons"]:
+            polygons.append(Polygon(map(lambda x: (x["x"], x["y"]),
+                                        p["points"])))
+        polygons = cascaded_union(polygons)
+        if "exterior" in dir(polygons):
+            polygons = [polygons]
+        hover_region = []
+        for p in polygons:
+            p = p.simplify(0.2)
+            hover_region.append({
+                "points": map(lambda x: {"x": x[0], "y": x[1]},
+                p.exterior.coords)
+            })
+
         boxes.append({
             "name": zone["name"],
-            "boundingBox": zone["bounding_box"]
+            "boundingBox": zone["bounding_box"],
+            "hoverRegion": hover_region
         })
 
         filename = re.sub(r'[^a-z0-9]+', '-', zone["name"].lower())
