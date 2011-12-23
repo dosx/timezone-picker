@@ -42,24 +42,24 @@ def collate_zones(shape_file):
         sys.stderr.write("Processing row for '%s'\n" % name)
 
         if not "transitions" in zones[name]:
-            timezone = pytz.timezone(name)
+            tz = pytz.timezone(name)
             transition_info = []
-            if "_utc_transition_times" not in dir(timezone):
+            if "_utc_transition_times" not in dir(tz):
                 # Assume no daylight savings
-                td = timezone.utcoffset(datetime.datetime(2000, 1, 1))
+                td = tz.utcoffset(datetime.datetime(2000, 1, 1))
                 zones[name]["transitions"] = [{
                     "time": 0,
                     "utc_offset": timedelta_to_seconds(td),
-                    "tzname": timezone.tzname(datetime.datetime(2000, 1, 1))
+                    "tzname": tz.tzname(datetime.datetime(2000, 1, 1))
                 }]
-                continue
-            for i, transition_time in enumerate(timezone._utc_transition_times):
-                td = timezone._transition_info[i][0]
-                transition_info.append({
-                    "time": time.mktime(transition_time.timetuple()),
-                    "utc_offset": timedelta_to_seconds(td),
-                    "tzname": timezone._transition_info[i][2]
-                })
+            else:
+                for i, transition_time in enumerate(tz._utc_transition_times):
+                    td = tz._transition_info[i][0]
+                    transition_info.append({
+                        "time": time.mktime(transition_time.timetuple()),
+                        "utc_offset": timedelta_to_seconds(td),
+                        "tzname": tz._transition_info[i][2]
+                    })
 
             zones[name]["transitions"] = transition_info
 
