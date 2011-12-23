@@ -28,26 +28,22 @@
       var centroid;
       _mapZones[name] = [];
       $.each(data.polygons, function(i, polygon) {
-        // Ray casting counters for hit testing. Both having odd counts mean
-        // the point is in the polygon
-        var latTest = 0;
-        var lngTest = 0;
+        // Ray casting counters for hit testing.
+        var rayTest = 0;
         var lastPoint = polygon.points[polygon.points.length - 1];
 
         var coords = [];
         $.each(polygon.points, function(j, point) {
           coords.push(new google.maps.LatLng(point.y, point.x));
 
-          // Ray casting tests
-          if (((lastPoint.y <= lat && point.y >= lat) ||
-            (lastPoint.y > lat && point.y < lat)) &&
-            (lastPoint.x < lng || point.x < lng)) {
-            latTest++;
-          }
-          if (((lastPoint.x <= lng && point.x >= lng) ||
-            (lastPoint.x > lng && point.x < lng)) &&
-            (lastPoint.y < lat || point.y < lat)) {
-            lngTest++;
+          // Ray casting test
+          if ((lastPoint.y <= lat && point.y >= lat) ||
+            (lastPoint.y > lat && point.y < lat)) {
+            var slope = (point.x - lastPoint.x) / (point.y - lastPoint.y);
+            var testPoint = slope * (lat - lastPoint.y) + lastPoint.x;
+            if (testPoint < lng) {
+              rayTest++;
+            }
           }
 
           lastPoint = point;
@@ -55,8 +51,8 @@
 
         allCoords.push(coords);
 
-        // If the count is odd in each dimension, we are in the polygon
-        inZone |= (latTest % 2 === 1) && (lngTest % 2 === 1);
+        // If the count is odd, we are in the polygon
+        inZone |= (rayTest % 2 === 1);
 
         // Hack to get the centroid of the largest area polygon - we just check
         // which has the most edges
