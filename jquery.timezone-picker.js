@@ -1,9 +1,13 @@
 (function($) {
+  var _options;
+
   var _boundingBoxes;
   var _map;
-  var _options;
   var _mapZones = {};
   var _transitions = {};
+
+  var _loader;
+  var _needsLoader = 0;
 
   var clearZones = function() {
     $.each(_mapZones, function(i, zone) {
@@ -30,6 +34,12 @@
     }
 
     $.get(_options.jsonRootUrl + 'polygons/' + name + '.json', function(data) {
+      _needsLoader--;
+      if (_needsLoader === 0 && _loader) {
+        _loader.remove();
+        _loader = null;
+      }
+
       data = typeof data === 'string' ? JSON.parse(data) : data;
 
       var inZone = false;
@@ -156,6 +166,8 @@
 
   var methods = {
     init: function(options) {
+      var self = this;
+
       // Populate the options and set defaults
       _options = options || {};
       _options.initialZoom = _options.initialZoom || 2;
@@ -170,7 +182,7 @@
       _options.onInfoWindow = _options.onInfoWindow || onInfoWindow;
 
       // Create the maps instance
-      _map = new google.maps.Map(this.get(0), {
+      _map = new google.maps.Map(self.get(0), {
         zoom: _options.initialZoom,
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         center: new google.maps.LatLng(_options.initialLat, _options.initialLng)
@@ -192,9 +204,18 @@
           }
         });
 
-        if (_map.lastInfoWindow) {
-          _map.lastInfoWindow.close();
-        }
+        _needsLoader = candidates.length;
+        setTimeout(function() {
+          if (_needsLoader > 0) {
+            _loader = $('<div style="background: url(' + maskPng +
+              ');z-index:10000;position: absolute;top:0;left:0;">' +
+              '<img style="position:absolute;' +
+              'top:50%; left:50%;margin-top:-8px;margin-left:-8px" ' +
+              'src="' + loaderGif + '" /></div>');
+            _loader.height(self.height()).width(self.width());
+            self.append(_loader);
+          }
+        }, 500);
 
         clearZones();
         $.each(candidates, function(i, v) {
@@ -216,4 +237,6 @@
     }
   };
 
+  var loaderGif = "data:image/gif;base64,R0lGODlhEAAQAPIAAKqqqv///729vejo6P///93d3dPT083NzSH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCgAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa+dIAAAh+QQJCgAAACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkECQoAAAAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkECQoAAAAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo/IpHI5TAAAIfkECQoAAAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo/IpFKSAAAh+QQJCgAAACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh+QQJCgAAACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAkKAAAALAAAAAAQABAAAAMyCLrc/jDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA==";
+  var maskPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9sJDgA6CHKQBUUAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAADUlEQVQI12NgYGDwAQAAUQBNbrgEdAAAAABJRU5ErkJggg==";
 })(jQuery);
