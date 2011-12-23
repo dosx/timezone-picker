@@ -138,7 +138,7 @@
       _options.strokeOpacity = _options.strokeOpacity || 0.7;
       _options.fillColor = _options.fillColor || '#ffcccc';
       _options.fillOpacity = _options.fillOpacity || 0.5;
-      _options.jsonRootUrl = _options.jsonRootUrl || '/tz_json/';
+      _options.jsonRootUrl = _options.jsonRootUrl || 'tz_json/';
 
       // Create the maps instance
       _map = new google.maps.Map(this.get(0), {
