@@ -3,6 +3,7 @@
   var _map;
   var _options;
   var _mapZones = {};
+  var _transitions = {};
 
   var clearZones = function() {
     $.each(_mapZones, function(i, zone) {
@@ -14,14 +15,24 @@
     _mapZones = {};
   };
 
-  var onInfoWindow = function(olsonName) {
-    return '<h1>' + olsonName + '</h1>';
+  var onInfoWindow = function(olsonName, utcOffset) {
+    return '<h1>' + olsonName + ' [' + (utcOffset / 60 / 60) + ']</h1>';
+  };
+
+  var slugifyName = function(name) {
+    return name.toLowerCase().replace(/[^a-z0-9]/g, '_');
   };
 
   var drawZone = function(name, lat, lng) {
     if (_mapZones[name]) {
       return;
     }
+
+    $.get(_options.jsonRootUrl + 'transitions/' + name + '.json',
+    function(data) {
+      _transitions[name] = typeof data === 'string' ? JSON.parse(data) :
+        data;
+    });
 
     $.get(_options.jsonRootUrl + 'polygons/' + name + '.json', function(data) {
       data = typeof data === 'string' ? JSON.parse(data) : data;
@@ -85,12 +96,21 @@
           _map.lastInfoWindow.close();
         }
 
-        // TODO: Add more information to this bubble
-        var id = data.name.toLowerCase().replace(
-          /[^a-z0-9]/g, '_');
+        var id = slugifyName(data.name);
+
+        // Figure out the UTC offset
+        var transitions = _transitions[name].transitions;
+        var now = new Date().getTime();
+        var utcOffset = 0;
+        $.each(transitions, function(i, transition) {
+          if (transition.time < now) {
+            utcOffset = transition.utc_offset;
+          }
+        });
+
         var infowindow = new google.maps.InfoWindow({
           content: '<div id="' + id + '" class="timezone-picker-infowindow">' +
-            _options.onInfoWindow(data.name) +
+            _options.onInfoWindow(data.name, utcOffset) +
             '<div class="timezone-picker-buttons">' +
             '<button>Use Timezone</button><button>Cancel</button>' +
             '</div>' +

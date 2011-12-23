@@ -10,6 +10,13 @@
 
   <script>
   $(function() {
+    var pad = function(d) {
+      if (d < 10) {
+        return '0' + d;
+      }
+      return d.toString();
+    };
+
     $("#zonepicker").timezonePicker({
       initialLat: 40.71,
       initialLng: -74.00,
@@ -17,8 +24,16 @@
       onSelected: function(zone) {
         alert('Timezone Selected: ' + zone);
       },
-      onInfoWindow: function(olsonName) {
-        return '<h2>' + olsonName + '</h2>'
+      onInfoWindow: function(olsonName, utcOffset) {
+        var now = new Date();
+        var delta = now.setHours(now.getHours() +
+          (now.getTimezoneOffset() + utcOffset / 60) / 60);
+        return '<h1>' + olsonName + ' ' +
+          pad(now.getHours()) + ':' +
+          pad(now.getMinutes()) + ':' +
+          pad(now.getSeconds()) +
+          ' [' + (utcOffset / 60 / 60) + ']'
+          '</h1>';
       }
     });
   });

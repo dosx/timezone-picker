@@ -1,8 +1,11 @@
+import datetime
 import os
 import re
+import pytz
 import shpUtils
 import simplejson
 from shapely.geometry import Polygon
+import time
 import sys
 
 def simplify(points):
@@ -13,6 +16,9 @@ def simplify(points):
             polygon.exterior.coords),
         "centroid": (polygon.centroid.x, polygon.centroid.y)
     }
+
+def timedelta_to_seconds(td):
+    return td.days * 24 * 60 * 60 + td.seconds
 
 def collate_zones(shape_file):
     zones = {}
@@ -35,6 +41,26 @@ def collate_zones(shape_file):
 
         sys.stderr.write("Processing row for '%s'\n" % name)
 
+        if not "transitions" in zones[name]:
+            timezone = pytz.timezone(name)
+            transition_info = []
+            if "_utc_transition_times" not in dir(timezone):
+                # Assume no daylight savings
+                td = timezone.utcoffset(datetime.datetime(2000, 1, 1))
+                zones[name]["transitions"] = [{
+                    "time": 0,
+                    "utc_offset": timedelta_to_seconds(td)
+                }]
+                continue
+            for i, transition_time in enumerate(timezone._utc_transition_times):
+                td = timezone._transition_info[i][0]
+                transition_info.append({
+                    "time": time.mktime(transition_time.timetuple()),
+                    "utc_offset": timedelta_to_seconds(td)
+                })
+
+            zones[name]["transitions"] = transition_info
+
         shp_data = row["shp_data"]
         for part in shp_data["parts"]:
             zones[name]["polygons"].append(simplify(part["points"]))
@@ -54,10 +80,10 @@ if __name__ == '__main__':
 
     zones = collate_zones(sys.argv[1])
     boxes = []
-    polygons = []
 
     output_dir = sys.argv[2]
     os.mkdir(os.path.join(output_dir, "polygons"))
+    os.mkdir(os.path.join(output_dir, "transitions"))
     for name, zone in zones.iteritems():
         boxes.append({
             "name": name,
@@ -70,6 +96,12 @@ if __name__ == '__main__':
             simplejson.dumps({
                 "name": name,
                 "polygons": zone["polygons"]
+            }))
+        out_file = os.path.join(output_dir, "transitions", "%s.json" % filename)
+        open(out_file, "w").write(
+            simplejson.dumps({
+                "name": name,
+                "transitions": zone["transitions"]
             }))
 
     open(os.path.join(output_dir, "bounding_boxes.json"), "w").write(

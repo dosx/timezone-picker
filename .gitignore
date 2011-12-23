@@ -1,2 +1,4 @@
 *.pyc
 tz_json/
+.project
+.pydevproject
