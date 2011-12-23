@@ -118,13 +118,16 @@
         });
 
         google.maps.event.addListener(infowindow, 'domready', function() {
+          // HACK: Put rounded corners on the infowindow
+          $('#' + id).parent().parent().parent().prev().css('border-radius',
+            '5px');
           $('#' + id + ' button:eq(0)').click(function(e) {
             if (e.which > 1) {
               return;
             }
 
             if (_options.onSelected) {
-              _options.onSelected(data.name);
+              _options.onSelected(data.name, utcOffset, tzName);
             }
 
             e.preventDefault();
