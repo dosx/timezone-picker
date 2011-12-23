@@ -46,6 +46,7 @@
       var allCoords = [];
       var maxPoints = 0;
       var centroid;
+      var selectedZoneName;
       _mapZones[name] = [];
       _transitions[name] = data.transitions;
 
@@ -74,13 +75,17 @@
         allCoords.push(coords);
 
         // If the count is odd, we are in the polygon
-        inZone |= (rayTest % 2 === 1);
+        var odd = (rayTest % 2 === 1);
+        inZone |= odd;
+        if (odd) {
+          selectedZoneName = polygon.name;
 
-        // Hack to get the centroid of the largest polygon - we just check
-        // which has the most edges
-        if (polygon.points.length > maxPoints) {
-          centroid = polygon.centroid;
-          maxPoints = polygon.points.length;
+          // Hack to get the centroid of the largest polygon - we just check
+          // which has the most edges
+          if (polygon.points.length > maxPoints) {
+            centroid = polygon.centroid;
+            maxPoints = polygon.points.length;
+          }
         }
       });
 
@@ -106,7 +111,7 @@
         var id = slugifyName(data.name);
 
         // Figure out the UTC offset
-        var transitions = _transitions[name];
+        var transitions = _transitions[name][selectedZoneName];
         var now = new Date().getTime();
         var utcOffset = 0;
         var tzName = '';
@@ -119,7 +124,7 @@
 
         var infowindow = new google.maps.InfoWindow({
           content: '<div id="' + id + '" class="timezone-picker-infowindow">' +
-            _options.onInfoWindow(data.name, utcOffset, tzName) +
+            _options.onInfoWindow(selectedZoneName, utcOffset, tzName) +
             '<div class="timezone-picker-buttons">' +
             '<button>Use Timezone</button><button>Cancel</button>' +
             '</div>' +
@@ -137,7 +142,7 @@
             }
 
             if (_options.onSelected) {
-              _options.onSelected(data.name, utcOffset, tzName);
+              _options.onSelected(selectedZoneName, utcOffset, tzName);
             }
 
             e.preventDefault();
@@ -193,6 +198,9 @@
       });
 
       google.maps.event.addListener(_map, 'click', function(e) {
+        if (_needsLoader > 0) {
+          return;
+        }
         var lat = e.latLng.Qa;
         var lng = e.latLng.Ra;
 

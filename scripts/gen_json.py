@@ -11,6 +11,7 @@ import sys
 def simplify(points):
     polygon = Polygon(map(lambda x: (x["x"], x["y"]), points))
     polygon = polygon.simplify(0.05)
+
     return {
         "points": map(lambda x: {"x": x[0], "y": x[1]},
             polygon.exterior.coords),
@@ -24,12 +25,59 @@ def collate_zones(shape_file):
     zones = {}
     print "Loading SHP file..."
     rows = shpUtils.loadShapefile(shape_file)
+    collation_now = time.time()
     for row in rows:
         name = row["dbf_data"]["TZID"].strip()
         if name == "uninhabited":
             continue
 
-        zones[name] = zones.get(name, {
+        sys.stderr.write("Processing row for '%s'\n" % name)
+
+        transition_info = []
+        tz = pytz.timezone(name)
+        if "_utc_transition_times" not in dir(tz):
+            # Assume no daylight savings
+            td = tz.utcoffset(datetime.datetime(2000, 1, 1))
+            transition_info = [{
+                "time": 0,
+                "utc_offset": timedelta_to_seconds(td),
+                "tzname": tz.tzname(datetime.datetime(2000, 1, 1))
+            }]
+        else:
+            for i, transition_time in enumerate(tz._utc_transition_times):
+                td = tz._transition_info[i][0]
+                transition_info.append({
+                    "time": time.mktime(transition_time.timetuple()),
+                    "utc_offset": timedelta_to_seconds(td),
+                    "tzname": tz._transition_info[i][2]
+                })
+
+        # calculate a collation key based on future timezone transitions
+        collation_key = ''
+        for t in transition_info:
+            if t["time"] >= collation_now:
+                collation_key += "%d>%d," % (t["time"], t["utc_offset"])
+
+        # for non-daylight savings regions, just use the utc_offset
+        if len(collation_key) == 0:
+            collation_key = "0>%d" % transition_info[-1]["utc_offset"]
+
+
+        zones[collation_key] = zones.get(collation_key, {
+            "bounding_box": {
+                "xmin": sys.maxint,
+                "ymin": sys.maxint,
+                "xmax":-sys.maxint - 1,
+                "ymax":-sys.maxint - 1
+            },
+            "polygons": [],
+            "transitions": {},
+            "name": name
+        })
+
+        zones[collation_key]["transitions"][name] = transition_info
+
+        zones[collation_key] = zones.get(collation_key, {
             "bounding_box": {
                 "xmin": sys.maxint,
                 "ymin": sys.maxint,
@@ -39,35 +87,13 @@ def collate_zones(shape_file):
             "polygons": []
         })
 
-        sys.stderr.write("Processing row for '%s'\n" % name)
-
-        if not "transitions" in zones[name]:
-            tz = pytz.timezone(name)
-            transition_info = []
-            if "_utc_transition_times" not in dir(tz):
-                # Assume no daylight savings
-                td = tz.utcoffset(datetime.datetime(2000, 1, 1))
-                zones[name]["transitions"] = [{
-                    "time": 0,
-                    "utc_offset": timedelta_to_seconds(td),
-                    "tzname": tz.tzname(datetime.datetime(2000, 1, 1))
-                }]
-            else:
-                for i, transition_time in enumerate(tz._utc_transition_times):
-                    td = tz._transition_info[i][0]
-                    transition_info.append({
-                        "time": time.mktime(transition_time.timetuple()),
-                        "utc_offset": timedelta_to_seconds(td),
-                        "tzname": tz._transition_info[i][2]
-                    })
-
-            zones[name]["transitions"] = transition_info
-
         shp_data = row["shp_data"]
         for part in shp_data["parts"]:
-            zones[name]["polygons"].append(simplify(part["points"]))
+            polygonInfo = simplify(part["points"])
+            polygonInfo["name"] = name
+            zones[collation_key]["polygons"].append(polygonInfo)
 
-        b = zones[name]["bounding_box"]
+        b = zones[collation_key]["bounding_box"]
         b["xmin"] = min(b["xmin"], shp_data["xmin"])
         b["ymin"] = min(b["ymin"], shp_data["ymin"])
         b["xmax"] = max(b["xmax"], shp_data["xmax"])
@@ -85,17 +111,17 @@ if __name__ == '__main__':
 
     output_dir = sys.argv[2]
     os.mkdir(os.path.join(output_dir, "polygons"))
-    for name, zone in zones.iteritems():
+    for key, zone in zones.iteritems():
         boxes.append({
-            "name": name,
+            "name": zone["name"],
             "boundingBox": zone["bounding_box"]
         })
 
-        filename = re.sub(r'[^a-z0-9]+', '-', name.lower())
+        filename = re.sub(r'[^a-z0-9]+', '-', zone["name"].lower())
         out_file = os.path.join(output_dir, "polygons", "%s.json" % filename)
         open(out_file, "w").write(
             simplejson.dumps({
-                "name": name,
+                "name": zone["name"],
                 "polygons": zone["polygons"],
                 "transitions": zone["transitions"]
             }))
