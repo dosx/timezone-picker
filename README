@@ -25,6 +25,12 @@ strokeOpacity: the opacity of the outline of rendered timezones (default 0.7)
 fillColor: the color of the fill of the rendered timezones (default '#ffcccc')
 fillOpacity: the opacity of the outline of rendered timezones (default 0.5)
 jsonRootUrl: the default root URL for the JSON data files (default '/tz_json/')
+onInfoWindow: callback for rendering the contents of the infowindow. Receives the Olson timezone name as the only parameter.
+
+CSS Classes
+-----------
+timezone-picker-infowindow: the main content container for the infowindow
+timezone-picker-buttons: the use/cancel buttons in the infowindow
 
 For Data File Generation
 ------------------------

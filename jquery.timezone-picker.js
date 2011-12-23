@@ -14,6 +14,10 @@
     _mapZones = {};
   };
 
+  var onInfoWindow = function(olsonName) {
+    return '<h1>' + olsonName + '</h1>';
+  };
+
   var drawZone = function(name, lat, lng) {
     if (_mapZones[name]) {
       return;
@@ -85,10 +89,12 @@
         var id = data.name.toLowerCase().replace(
           /[^a-z0-9]/g, '_');
         var infowindow = new google.maps.InfoWindow({
-          content: '<div id="' + id + '"><center>' +
-            '<h1>' + data.name + '</h1>' +
+          content: '<div id="' + id + '" class="timezone-picker-infowindow">' +
+            _options.onInfoWindow(data.name) +
+            '<div class="timezone-picker-buttons">' +
             '<button>Use Timezone</button><button>Cancel</button>' +
-            '</center></div>',
+            '</div>' +
+            '</div>',
           maxWidth: 500
         });
 
@@ -139,6 +145,7 @@
       _options.fillColor = _options.fillColor || '#ffcccc';
       _options.fillOpacity = _options.fillOpacity || 0.5;
       _options.jsonRootUrl = _options.jsonRootUrl || 'tz_json/';
+      _options.onInfoWindow = _options.onInfoWindow || onInfoWindow;
 
       // Create the maps instance
       _map = new google.maps.Map(this.get(0), {

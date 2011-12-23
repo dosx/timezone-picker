@@ -16,10 +16,22 @@
       initialZoom: 4,
       onSelected: function(zone) {
         alert('Timezone Selected: ' + zone);
+      },
+      onInfoWindow: function(olsonName) {
+        return '<h2>' + olsonName + '</h2>'
       }
     });
   });
   </script>
+  <style>
+    .timezone-picker-infowindow {
+      text-align: center;
+    }
+
+    .timezone-picker-buttons button {
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
   <div id="zonepicker" style="width: 100%; height: 100%;">
