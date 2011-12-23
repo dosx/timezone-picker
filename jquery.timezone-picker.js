@@ -4,7 +4,7 @@
   var _boundingBoxes;
   var _map;
   var _mapZones = {};
-  var _transitions = {};
+  var _transitions;
 
   var _loader;
   var _needsLoader = 0;
@@ -22,6 +22,79 @@
   var onInfoWindow = function(olsonName, utcOffset, tzName) {
     return '<h1>' + olsonName + '<br/>[' + tzName + ':' +
       (utcOffset / 60 / 60) + ']</h1>';
+  };
+
+  var showInfoWindow = function(polygon) {
+    // Hack to get the centroid of the largest polygon - we just check
+    // which has the most edges
+    var maxPoints = 0;
+    if (polygon.points.length > maxPoints) {
+      centroid = polygon.centroid;
+      maxPoints = polygon.points.length;
+    }
+
+    if (_map.lastInfoWindow) {
+      _map.lastInfoWindow.close();
+    }
+
+    var selectedZoneName = polygon.name;
+    var id = slugifyName(selectedZoneName);
+
+    // Figure out the UTC offset
+    var transitions = _transitions[selectedZoneName];
+    var now = new Date().getTime();
+    var utcOffset = 0;
+    var tzName = '';
+    $.each(transitions, function(i, transition) {
+      if (transition.time < now) {
+        utcOffset = transition.utc_offset;
+        tzName = transition.tzname;
+      }
+    });
+
+    var infowindow = new google.maps.InfoWindow({
+      content: '<div id="' + id + '" class="timezone-picker-infowindow">' +
+        _options.onInfoWindow(selectedZoneName, utcOffset, tzName) +
+        '<div class="timezone-picker-buttons">' +
+        '<button>Use Timezone</button><button>Cancel</button>' +
+        '</div>' +
+        '</div>',
+      maxWidth: 500
+    });
+
+    google.maps.event.addListener(infowindow, 'domready', function() {
+      // HACK: Put rounded corners on the infowindow
+      $('#' + id).parent().parent().parent().prev().css('border-radius',
+        '5px');
+      $('#' + id + ' button:eq(0)').click(function(e) {
+        if (e.which > 1) {
+          return;
+        }
+
+        if (_options.onSelected) {
+          _options.onSelected(selectedZoneName, utcOffset, tzName);
+        }
+
+        e.preventDefault();
+        return false;
+      });
+
+      $('#' + id + ' button:eq(1)').click(function(e) {
+        if (e.which > 1) {
+          return;
+        }
+        infowindow.close();
+        e.preventDefault();
+        return false;
+      });
+    });
+    infowindow.setPosition(new google.maps.LatLng(
+      centroid[1],
+      centroid[0]
+    ));
+    infowindow.open(_map);
+
+    _map.lastInfoWindow = infowindow;
   };
 
   var slugifyName = function(name) {
@@ -43,12 +116,10 @@
       data = typeof data === 'string' ? JSON.parse(data) : data;
 
       var inZone = false;
-      var allCoords = [];
-      var maxPoints = 0;
-      var centroid;
-      var selectedZoneName;
+      var allPolygons = [];
+      var selectedPolygon;
       _mapZones[name] = [];
-      _transitions[name] = data.transitions;
+      _transitions = data.transitions;
 
       $.each(data.polygons, function(i, polygon) {
         // Ray casting counter for hit testing.
@@ -72,27 +143,23 @@
           lastPoint = point;
         });
 
-        allCoords.push(coords);
+        allPolygons.push({
+          polygon: polygon,
+          coords: coords
+        });
 
         // If the count is odd, we are in the polygon
         var odd = (rayTest % 2 === 1);
         inZone |= odd;
         if (odd) {
-          selectedZoneName = polygon.name;
-
-          // Hack to get the centroid of the largest polygon - we just check
-          // which has the most edges
-          if (polygon.points.length > maxPoints) {
-            centroid = polygon.centroid;
-            maxPoints = polygon.points.length;
-          }
+          selectedPolygon = polygon;
         }
       });
 
       if (inZone) {
-        $.each(allCoords, function(i, coords) {
+        $.each(allPolygons, function(i, polygonInfo) {
           var mapPolygon = new google.maps.Polygon({
-            paths: coords,
+            paths: polygonInfo.coords,
             strokeColor: '#ff0000',
             strokeOpacity: 0.7,
             strokeWeight: 1,
@@ -101,70 +168,14 @@
           });
           mapPolygon.setMap(_map);
 
+          google.maps.event.addListener(mapPolygon, 'click', function() {
+            showInfoWindow(polygonInfo.polygon);
+          });
+
           _mapZones[name].push(mapPolygon);
         });
 
-        if (_map.lastInfoWindow) {
-          _map.lastInfoWindow.close();
-        }
-
-        var id = slugifyName(data.name);
-
-        // Figure out the UTC offset
-        var transitions = _transitions[name][selectedZoneName];
-        var now = new Date().getTime();
-        var utcOffset = 0;
-        var tzName = '';
-        $.each(transitions, function(i, transition) {
-          if (transition.time < now) {
-            utcOffset = transition.utc_offset;
-            tzName = transition.tzname;
-          }
-        });
-
-        var infowindow = new google.maps.InfoWindow({
-          content: '<div id="' + id + '" class="timezone-picker-infowindow">' +
-            _options.onInfoWindow(selectedZoneName, utcOffset, tzName) +
-            '<div class="timezone-picker-buttons">' +
-            '<button>Use Timezone</button><button>Cancel</button>' +
-            '</div>' +
-            '</div>',
-          maxWidth: 500
-        });
-
-        google.maps.event.addListener(infowindow, 'domready', function() {
-          // HACK: Put rounded corners on the infowindow
-          $('#' + id).parent().parent().parent().prev().css('border-radius',
-            '5px');
-          $('#' + id + ' button:eq(0)').click(function(e) {
-            if (e.which > 1) {
-              return;
-            }
-
-            if (_options.onSelected) {
-              _options.onSelected(selectedZoneName, utcOffset, tzName);
-            }
-
-            e.preventDefault();
-            return false;
-          });
-
-          $('#' + id + ' button:eq(1)').click(function(e) {
-            if (e.which > 1) {
-              return;
-            }
-            infowindow.close();
-            e.preventDefault();
-            return false;
-          });
-        });
-        infowindow.setPosition(new google.maps.LatLng(
-          centroid[1],
-          centroid[0]
-        ));
-        infowindow.open(_map);
-
-        _map.lastInfoWindow = infowindow;
+        showInfoWindow(selectedPolygon);
       }
     });
   };
