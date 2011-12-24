@@ -284,7 +284,7 @@
           var bb = v.boundingBox;
           if (lat > bb.ymin && lat < bb.ymax &&
             lng > bb.xmin && lng < bb.xmax) {
-            candidates.push(v.name.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+            candidates.push(slugifyName(v.name));
           }
         });
 
@@ -320,6 +320,7 @@
               if (!hoverRegion) {
                 return;
               }
+
               var result = hitTestAndConvert(hoverRegion, lat, lng);
               var slugName = slugifyName(v.name);
               if (result.inZone && slugName !== _currentHoverRegion &&
