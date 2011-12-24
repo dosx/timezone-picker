@@ -5,7 +5,8 @@
   var _boundingBoxes;
   var _map;
   var _mapZones = {};
-  var _transitions;
+  var _transitions = {};
+  var _currentSelectedRegion;
 
   var _hoverRegions = {};
   var _hoverPolygons = [];
@@ -47,7 +48,7 @@
   };
 
   var slugifyName = function(name) {
-    return name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    return name.toLowerCase().replace(/[^a-z0-9]/g, '-');
   };
 
   var showInfoWindow = function(polygon) {
@@ -188,11 +189,12 @@
       data = typeof data === 'string' ? JSON.parse(data) : data;
 
       _mapZones[name] = [];
-      _transitions = data.transitions;
+      $.extend(_transitions, data.transitions);
 
       var result = hitTestAndConvert(data.polygons, lat, lng);
 
       if (result.inZone) {
+        _currentSelectedRegion = name;
         $.each(result.allPolygons, function(i, polygonInfo) {
           var mapPolygon = new google.maps.Polygon({
             paths: polygonInfo.coords,
@@ -319,13 +321,15 @@
                 return;
               }
               var result = hitTestAndConvert(hoverRegion, lat, lng);
-              if (result.inZone && v.name !== _currentHoverRegion) {
+              var slugName = slugifyName(v.name);
+              if (result.inZone && slugName !== _currentHoverRegion &&
+                slugName !== _currentSelectedRegion)  {
                 $.each(_hoverPolygons, function(i, p) {
                   p.setMap(null);
                 });
 
                 _hoverPolygons = [];
-                _currentHoverRegion = v.name;
+                _currentHoverRegion = slugName;
 
                 $.each(result.allPolygons, function(i, polygonInfo) {
                   var mapPolygon = new google.maps.Polygon({
