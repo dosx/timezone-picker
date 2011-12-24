@@ -9,6 +9,10 @@ from shapely.ops import cascaded_union
 import time
 import sys
 
+def reduceJsonPrecision(jsonString, maxPrecision=6):
+    return re.sub(r'(\d).(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
+                  jsonString)
+
 def simplify(points):
     polygon = Polygon(map(lambda x: (x["x"], x["y"]), points))
     polygon = polygon.simplify(0.05)
@@ -171,8 +175,8 @@ if __name__ == '__main__':
             }))
 
     open(os.path.join(output_dir, "bounding_boxes.json"), "w").write(
-        simplejson.dumps(boxes)
+        reduceJsonPrecision(simplejson.dumps(boxes))
     )
     open(os.path.join(output_dir, "hover_regions.json"), "w").write(
-        simplejson.dumps(hovers)
+        reduceJsonPrecision(simplejson.dumps(hovers))
     )
