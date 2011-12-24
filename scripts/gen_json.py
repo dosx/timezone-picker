@@ -10,7 +10,7 @@ import time
 import sys
 
 def reduce_json_precision(jsonString, maxPrecision=6):
-    return re.sub(r'(\d).(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
+    return re.sub(r'(\d)\.(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
                   jsonString)
 
 def reduce_polygons(polygonData, hullAreaThreshold, bufferDistance,
@@ -178,11 +178,11 @@ if __name__ == '__main__':
                 "name": zone["name"],
                 "polygons": zone["polygons"],
                 "transitions": zone["transitions"]
-            }), 8))
+            }), 5))
 
     open(os.path.join(output_dir, "bounding_boxes.json"), "w").write(
-        reduce_json_precision(simplejson.dumps(boxes), 4)
+        reduce_json_precision(simplejson.dumps(boxes), 2)
     )
     open(os.path.join(output_dir, "hover_regions.json"), "w").write(
-        reduce_json_precision(simplejson.dumps(hovers))
+        reduce_json_precision(simplejson.dumps(hovers), 3)
     )
