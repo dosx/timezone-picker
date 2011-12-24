@@ -9,6 +9,11 @@ from shapely.ops import cascaded_union
 import time
 import sys
 
+def convert_points(polygons):
+    for polygon in polygons:
+        polygon["points"] = map(lambda x: [x["y"], x["x"]], polygon["points"])
+    return polygons
+
 def reduce_json_precision(jsonString, maxPrecision=6):
     return re.sub(r'(\d)\.(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
                   jsonString)
@@ -99,7 +104,7 @@ def collate_zones(shape_file):
             for i, transition_time in enumerate(tz._utc_transition_times):
                 td = tz._transition_info[i][0]
                 transition_info.append({
-                    "time": time.mktime(transition_time.timetuple()),
+                    "time": int(time.mktime(transition_time.timetuple())),
                     "utc_offset": timedelta_to_seconds(td),
                     "tzname": tz._transition_info[i][2]
                 })
@@ -163,7 +168,7 @@ if __name__ == '__main__':
 
         hovers.append({
             "name": zone["name"],
-            "hoverRegion": hover_region
+            "hoverRegion": convert_points(hover_region)
         })
 
         boxes.append({
@@ -176,7 +181,7 @@ if __name__ == '__main__':
         open(out_file, "w").write(
             reduce_json_precision(simplejson.dumps({
                 "name": zone["name"],
-                "polygons": zone["polygons"],
+                "polygons": convert_points(zone["polygons"]),
                 "transitions": zone["transitions"]
             }), 5))
 

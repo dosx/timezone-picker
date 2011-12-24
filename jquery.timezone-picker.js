@@ -136,13 +136,13 @@
 
       var coords = [];
       $.each(polygon.points, function(j, point) {
-        coords.push(new google.maps.LatLng(point.y, point.x));
+        coords.push(new google.maps.LatLng(point[0], point[1]));
 
         // Ray casting test
-        if ((lastPoint.y <= lat && point.y >= lat) ||
-          (lastPoint.y > lat && point.y < lat)) {
-          var slope = (point.x - lastPoint.x) / (point.y - lastPoint.y);
-          var testPoint = slope * (lat - lastPoint.y) + lastPoint.x;
+        if ((lastPoint[0] <= lat && point[0] >= lat) ||
+          (lastPoint[0] > lat && point[0] < lat)) {
+          var slope = (point[1] - lastPoint[1]) / (point[0] - lastPoint[0]);
+          var testPoint = slope * (lat - lastPoint[0]) + lastPoint[1];
           if (testPoint < lng) {
             rayTest++;
           }
@@ -215,6 +215,8 @@
 
         showInfoWindow(result.selectedPolygon);
       }
+    }).error(function() {
+      console.warn(arguments);
     });
   };
 
