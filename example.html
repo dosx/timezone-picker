@@ -26,8 +26,8 @@
       },
       onInfoWindow: function(olsonName, utcOffset, tzName) {
         var now = new Date();
-        var delta = now.setHours(now.getHours() +
-          (now.getTimezoneOffset() + utcOffset / 60) / 60);
+        var delta = now.setTime(now.getTime() +
+          (now.getTimezoneOffset() + utcOffset / 60) * 60 * 1000);
         return '<h1>' + olsonName + '<br/>' +
           pad(now.getHours()) + ':' +
           pad(now.getMinutes()) + ':' +
