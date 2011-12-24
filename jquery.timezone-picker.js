@@ -1,17 +1,35 @@
 (function($) {
+  var _self;
   var _options;
 
   var _boundingBoxes;
   var _map;
   var _mapZones = {};
+  var _transitions;
+
+  var _hoverRegions = {};
   var _hoverPolygons = [];
   var _currentHoverRegion;
-  var _transitions;
+
   var _loaderGif;
   var _maskPng;
-
   var _loader;
   var _needsLoader = 0;
+
+  var showLoader = function() {
+    _loader = $('<div style="background: url(' + _maskPng +
+      ');z-index:10000;position: absolute;top:0;left:0;">' +
+      '<img style="position:absolute;' +
+      'top:50%; left:50%;margin-top:-8px;margin-left:-8px" ' +
+      'src="' + _loaderGif + '" /></div>');
+    _loader.height(_self.height()).width(_self.width());
+    _self.append(_loader);
+  };
+
+  var hideLoader = function() {
+    _loader.remove();
+    _loader = null;
+  };
 
   var clearZones = function() {
     $.each(_mapZones, function(i, zone) {
@@ -152,7 +170,7 @@
     };
   };
 
-  var drawZone = function(name, lat, lng) {
+  var drawZone = function(name, lat, lng, callback) {
     if (_mapZones[name]) {
       return;
     }
@@ -160,8 +178,11 @@
     $.get(_options.jsonRootUrl + 'polygons/' + name + '.json', function(data) {
       _needsLoader--;
       if (_needsLoader === 0 && _loader) {
-        _loader.remove();
-        _loader = null;
+        hideLoader();
+      }
+
+      if (callback) {
+        callback();
       }
 
       data = typeof data === 'string' ? JSON.parse(data) : data;
@@ -197,7 +218,7 @@
 
   var methods = {
     init: function(options) {
-      var self = this;
+      _self = this;
 
       // Populate the options and set defaults
       _options = options || {};
@@ -212,62 +233,55 @@
       _options.jsonRootUrl = _options.jsonRootUrl || 'tz_json/';
       _options.onInfoWindow = _options.onInfoWindow || onInfoWindow;
 
+      if (typeof _options.hoverRegions === 'undefined') {
+        _options.hoverRegions = true;
+      }
+
       // Create the maps instance
-      _map = new google.maps.Map(self.get(0), {
+      _map = new google.maps.Map(_self.get(0), {
         zoom: _options.initialZoom,
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         center: new google.maps.LatLng(_options.initialLat, _options.initialLng)
       });
 
+      // Load the necessary data files
+      var loadCount = _options.hoverRegions ? 2 : 1;
+      var checkLoading = function() {
+        loadCount--;
+        if (loadCount === 0) {
+          hideLoader();
+        }
+      };
+
+      showLoader();
       $.get(_options.jsonRootUrl + 'bounding_boxes.json', function(data) {
         _boundingBoxes = typeof data === 'string' ? JSON.parse(data) : data;
+        checkLoading();
       });
 
-      google.maps.event.addListener(_map, 'mousemove', function(e) {
-        var lat = e.latLng.Qa;
-        var lng = e.latLng.Ra;
-
-        $.each(_boundingBoxes, function(i, v) {
-          var bb = v.boundingBox;
-          if (lat > bb.ymin && lat < bb.ymax && lng > bb.xmin && lng < bb.xmax) {
-            var result = hitTestAndConvert(v.hoverRegion, lat, lng);
-            if (result.inZone && v.name !== _currentHoverRegion) {
-              $.each(_hoverPolygons, function(i, p) {
-                p.setMap(null);
-              });
-
-              _hoverPolygons = [];
-              _currentHoverRegion = v.name;
-
-              $.each(result.allPolygons, function(i, polygonInfo) {
-                var mapPolygon = new google.maps.Polygon({
-                  paths: polygonInfo.coords,
-                  strokeColor: '#444444',
-                  strokeOpacity: 0.7,
-                  strokeWeight: 1,
-                  fillColor: '#888888',
-                  fillOpacity: 0.5
-                });
-                mapPolygon.setMap(_map);
-
-                _hoverPolygons.push(mapPolygon);
-              });
-            }
-          }
+      if (_options.hoverRegions) {
+        $.get(_options.jsonRootUrl + 'hover_regions.json', function(data) {
+          var hoverData = typeof data === 'string' ? JSON.parse(data) : data;
+          $.each(hoverData, function(i, v) {
+            _hoverRegions[v.name] = v.hoverRegion;
+          });
+          checkLoading();
         });
-      });
+      }
 
-      google.maps.event.addListener(_map, 'click', function(e) {
+      var mapClickHandler = function(e) {
         if (_needsLoader > 0) {
           return;
         }
+
         var lat = e.latLng.Qa;
         var lng = e.latLng.Ra;
 
         var candidates = [];
         $.each(_boundingBoxes, function(i, v) {
           var bb = v.boundingBox;
-          if (lat > bb.ymin && lat < bb.ymax && lng > bb.xmin && lng < bb.xmax) {
+          if (lat > bb.ymin && lat < bb.ymax &&
+            lng > bb.xmin && lng < bb.xmax) {
             candidates.push(v.name.toLowerCase().replace(/[^a-z0-9]/g, '-'));
           }
         });
@@ -275,21 +289,67 @@
         _needsLoader = candidates.length;
         setTimeout(function() {
           if (_needsLoader > 0) {
-            _loader = $('<div style="background: url(' + _maskPng +
-              ');z-index:10000;position: absolute;top:0;left:0;">' +
-              '<img style="position:absolute;' +
-              'top:50%; left:50%;margin-top:-8px;margin-left:-8px" ' +
-              'src="' + _loaderGif + '" /></div>');
-            _loader.height(self.height()).width(self.width());
-            self.append(_loader);
+            showLoader();
           }
         }, 500);
 
         clearZones();
         $.each(candidates, function(i, v) {
-          drawZone(v, lat, lng);
+          drawZone(v, lat, lng, function() {
+            $.each(_hoverPolygons, function(i, p) {
+              p.setMap(null);
+            });
+            _hoverPolygons = [];
+            _currentHoverRegion = null;
+          });
         });
-      });
+      };
+
+      if (_options.hoverRegions) {
+        google.maps.event.addListener(_map, 'mousemove', function(e) {
+          var lat = e.latLng.Qa;
+          var lng = e.latLng.Ra;
+
+          $.each(_boundingBoxes, function(i, v) {
+            var bb = v.boundingBox;
+            if (lat > bb.ymin && lat < bb.ymax &&
+              lng > bb.xmin && lng < bb.xmax) {
+              var hoverRegion = _hoverRegions[v.name];
+              if (!hoverRegion) {
+                return;
+              }
+              var result = hitTestAndConvert(hoverRegion, lat, lng);
+              if (result.inZone && v.name !== _currentHoverRegion) {
+                $.each(_hoverPolygons, function(i, p) {
+                  p.setMap(null);
+                });
+
+                _hoverPolygons = [];
+                _currentHoverRegion = v.name;
+
+                $.each(result.allPolygons, function(i, polygonInfo) {
+                  var mapPolygon = new google.maps.Polygon({
+                    paths: polygonInfo.coords,
+                    strokeColor: '#444444',
+                    strokeOpacity: 0.7,
+                    strokeWeight: 1,
+                    fillColor: '#888888',
+                    fillOpacity: 0.5
+                  });
+                  mapPolygon.setMap(_map);
+
+                  google.maps.event.addListener(mapPolygon, 'click',
+                  mapClickHandler);
+
+                  _hoverPolygons.push(mapPolygon);
+                });
+              }
+            }
+          });
+        });
+      }
+
+      google.maps.event.addListener(_map, 'click', mapClickHandler);
      }
   };
 

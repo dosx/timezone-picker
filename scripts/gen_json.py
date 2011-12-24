@@ -111,6 +111,7 @@ if __name__ == '__main__':
 
     zones = collate_zones(sys.argv[1])
     boxes = []
+    hovers = []
 
     output_dir = sys.argv[2]
     os.mkdir(os.path.join(output_dir, "polygons"))
@@ -118,23 +119,46 @@ if __name__ == '__main__':
         # calculate a hover region
         polygons = []
         for p in zone["polygons"]:
-            polygons.append(Polygon(map(lambda x: (x["x"], x["y"]),
-                                        p["points"])))
+            polygon = Polygon(map(lambda x: (x["x"], x["y"]),
+                                  p["points"]))
+            if polygon.area < 1:
+                polygon = polygon.convex_hull
+            polygon = polygon.buffer(0.1, 4)
+            polygons.append(polygon)
+
         polygons = cascaded_union(polygons)
+
+        # Normalize the Polygon or MultiPolygon into an array
         if "exterior" in dir(polygons):
             polygons = [polygons]
+        else:
+            polygons = [p for p in polygons]
+
         hover_region = []
+        polygons.sort(key=lambda x: -x.area)
+        count = 0
         for p in polygons:
-            p = p.simplify(0.2)
+            # Try to include regions that are big enough, once we have a
+            # few representative regions
+            if count > 3 and p.area < 0.5:
+                break
+
+            p = p.simplify(0.05)
+            count += 1
             hover_region.append({
                 "points": map(lambda x: {"x": x[0], "y": x[1]},
-                p.exterior.coords)
+                              p.exterior.coords)
             })
+        print '%s: %d' % (zone["name"], count)
+
+        hovers.append({
+            "name": zone["name"],
+            "hoverRegion": hover_region
+        })
 
         boxes.append({
             "name": zone["name"],
-            "boundingBox": zone["bounding_box"],
-            "hoverRegion": hover_region
+            "boundingBox": zone["bounding_box"]
         })
 
         filename = re.sub(r'[^a-z0-9]+', '-', zone["name"].lower())
@@ -148,4 +172,7 @@ if __name__ == '__main__':
 
     open(os.path.join(output_dir, "bounding_boxes.json"), "w").write(
         simplejson.dumps(boxes)
+    )
+    open(os.path.join(output_dir, "hover_regions.json"), "w").write(
+        simplejson.dumps(hovers)
     )
