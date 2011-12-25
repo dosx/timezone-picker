@@ -9,72 +9,11 @@ from shapely.ops import cascaded_union
 import time
 import sys
 
-def convert_points(polygons):
-    for polygon in polygons:
-        polygon["points"] = map(lambda x: [x["y"], x["x"]], polygon["points"])
-    return polygons
-
-def reduce_json_precision(jsonString, maxPrecision=6):
-    return re.sub(r'(\d)\.(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
-                  jsonString)
-
-def reduce_polygons(polygonData, hullAreaThreshold, bufferDistance,
-                   bufferResolution, numThreshold, areaThreshold,
-                   simplifyThreshold):
-    polygons = []
-    for p in polygonData:
-        polygon = Polygon(map(lambda x: (x["x"], x["y"]),
-                              p["points"]))
-        if polygon.area < hullAreaThreshold:
-            polygon = polygon.convex_hull
-        polygon = polygon.buffer(bufferDistance, bufferResolution)
-        polygons.append(polygon)
-
-    polygons = cascaded_union(polygons)
-
-    # Normalize the Polygon or MultiPolygon into an array
-    if "exterior" in dir(polygons):
-        polygons = [polygons]
-    else:
-        polygons = [p for p in polygons]
-
-    region = []
-    polygons.sort(key=lambda x: -x.area)
-    count = 0
-    for p in polygons:
-        # Try to include regions that are big enough, once we have a
-        # few representative regions
-        if count > numThreshold and p.area < areaThreshold:
-            break
-
-        p = p.simplify(simplifyThreshold)
-        count += 1
-        region.append({
-            "points": map(lambda x: {"x": x[0], "y": x[1]},
-                          p.exterior.coords)
-        })
-
-    return region
-
-def simplify(points):
-    polygon = Polygon(map(lambda x: (x["x"], x["y"]), points))
-    polygon = polygon.simplify(0.05)
-
-    return {
-        "points": map(lambda x: {"x": x[0], "y": x[1]},
-            polygon.exterior.coords),
-        "centroid": (polygon.centroid.x, polygon.centroid.y),
-        "bounds": polygon.bounds
-    }
-
-def timedelta_to_seconds(td):
-    return td.days * 24 * 60 * 60 + td.seconds
-
 def collate_zones(shape_file):
+    # First collate the polygons by zone name
     print "Loading SHP file..."
-    collated = {}
     rows = shpUtils.loadShapefile(shape_file)
-    collation_now = time.time()
+    collated = {}
     for row in rows:
         name = row["dbf_data"]["TZID"].strip()
         if name == "uninhabited":
@@ -87,7 +26,9 @@ def collate_zones(shape_file):
                 "points": p["points"],
             })
 
+    # Then add some information and try to simplify/reduce the polygons
     zones = {}
+    collation_now = time.time()
     for name, shp_data in collated.iteritems():
         sys.stderr.write("Simpifying %s\n" % name)
         transition_info = []
@@ -148,6 +89,72 @@ def collate_zones(shape_file):
             del polygonInfo["bounds"]
 
     return zones
+
+def convert_points(polygons):
+    # Convert {x,y} to [lat,lng], for more compact JSON
+    for polygon in polygons:
+        polygon["points"] = map(lambda x: [x["y"], x["x"]], polygon["points"])
+    return polygons
+
+def reduce_json_precision(jsonString, maxPrecision=6):
+    return re.sub(r'(\d)\.(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
+                  jsonString)
+
+def reduce_polygons(polygonData, hullAreaThreshold, bufferDistance,
+                   bufferResolution, numThreshold, areaThreshold,
+                   simplifyThreshold):
+    polygons = []
+    for p in polygonData:
+        polygon = Polygon(map(lambda x: (x["x"], x["y"]),
+                              p["points"]))
+
+        # For very small regions, use a convex hull
+        if polygon.area < hullAreaThreshold:
+            polygon = polygon.convex_hull
+        # Also buffer by a small distance to aid the cascaded union
+        polygon = polygon.buffer(bufferDistance, bufferResolution)
+
+        polygons.append(polygon)
+
+    # Try to merge some polygons
+    polygons = cascaded_union(polygons)
+
+    # Normalize the Polygon or MultiPolygon into an array
+    if "exterior" in dir(polygons):
+        polygons = [polygons]
+    else:
+        polygons = [p for p in polygons]
+
+    region = []
+    # Sort from largest to smallest to faciliate dropping of small regions
+    polygons.sort(key=lambda x: -x.area)
+    for p in polygons:
+        # Try to include regions that are big enough, once we have a
+        # few representative regions
+        if len(region) > numThreshold and p.area < areaThreshold:
+            break
+
+        p = p.simplify(simplifyThreshold)
+        region.append({
+            "points": map(lambda x: {"x": x[0], "y": x[1]},
+                          p.exterior.coords)
+        })
+
+    return region
+
+def simplify(points):
+    polygon = Polygon(map(lambda x: (x["x"], x["y"]), points))
+    polygon = polygon.simplify(0.05)
+
+    return {
+        "points": map(lambda x: {"x": x[0], "y": x[1]},
+            polygon.exterior.coords),
+        "centroid": (polygon.centroid.x, polygon.centroid.y),
+        "bounds": polygon.bounds
+    }
+
+def timedelta_to_seconds(td):
+    return td.days * 24 * 60 * 60 + td.seconds
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
