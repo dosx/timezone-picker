@@ -36,29 +36,26 @@ def collate_zones(shape_file):
         if "_utc_transition_times" not in dir(tz):
             # Assume no daylight savings
             td = tz.utcoffset(datetime.datetime(2000, 1, 1))
-            transition_info = [{
-                "time": 0,
-                "utc_offset": timedelta_to_seconds(td),
-                "tzname": tz.tzname(datetime.datetime(2000, 1, 1))
-            }]
+            transition_info.append([0, timedelta_to_seconds(td),
+                                     tz.tzname(datetime.datetime(2000, 1, 1))])
         else:
             for i, transition_time in enumerate(tz._utc_transition_times):
                 td = tz._transition_info[i][0]
-                transition_info.append({
-                    "time": int(time.mktime(transition_time.timetuple())),
-                    "utc_offset": timedelta_to_seconds(td),
-                    "tzname": tz._transition_info[i][2]
-                })
+                transition_info.append([
+                    int(time.mktime(transition_time.timetuple())),
+                    timedelta_to_seconds(td),
+                    tz._transition_info[i][2]
+                ])
 
         # calculate a collation key based on future timezone transitions
         collation_key = ''
         for t in transition_info:
-            if t["time"] >= collation_now:
-                collation_key += "%d>%d," % (t["time"], t["utc_offset"])
+            if t[0] >= collation_now:
+                collation_key += "%d>%d," % (t[0], t[1])
 
         # for non-daylight savings regions, just use the utc_offset
         if len(collation_key) == 0:
-            collation_key = "0>%d" % transition_info[-1]["utc_offset"]
+            collation_key = "0>%d" % transition_info[-1][1]
 
         zones[collation_key] = zones.get(collation_key, {
             "bounding_box": {
@@ -96,9 +93,13 @@ def convert_points(polygons):
         polygon["points"] = map(lambda x: [x["y"], x["x"]], polygon["points"])
     return polygons
 
-def reduce_json_precision(jsonString, maxPrecision=6):
-    return re.sub(r'(\d)\.(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
-                  jsonString)
+def reduce_json(jsonString, maxPrecision=6):
+    reduced_precision = re.sub(
+        r'(\d)\.(\d{' + str(maxPrecision) + r'})(\d+)', r'\1.\2',
+        jsonString
+    )
+
+    return re.sub(r'\s', '', reduced_precision)
 
 def reduce_polygons(polygonData, hullAreaThreshold, bufferDistance,
                    bufferResolution, numThreshold, areaThreshold,
@@ -186,15 +187,15 @@ if __name__ == '__main__':
         filename = re.sub(r'[^a-z0-9]+', '-', zone["name"].lower())
         out_file = os.path.join(output_dir, "polygons", "%s.json" % filename)
         open(out_file, "w").write(
-            reduce_json_precision(simplejson.dumps({
+            reduce_json(simplejson.dumps({
                 "name": zone["name"],
                 "polygons": convert_points(zone["polygons"]),
                 "transitions": zone["transitions"]
             }), 5))
 
     open(os.path.join(output_dir, "bounding_boxes.json"), "w").write(
-        reduce_json_precision(simplejson.dumps(boxes), 2)
+        reduce_json(simplejson.dumps(boxes), 2)
     )
     open(os.path.join(output_dir, "hover_regions.json"), "w").write(
-        reduce_json_precision(simplejson.dumps(hovers), 3)
+        reduce_json(simplejson.dumps(hovers), 3)
     )

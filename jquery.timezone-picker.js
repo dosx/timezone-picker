@@ -160,9 +160,9 @@
     var utcOffset = 0;
     var tzName = '';
     $.each(transitions, function(i, transition) {
-      if (transition.time < now) {
-        utcOffset = transition.utc_offset;
-        tzName = transition.tzname;
+      if (transition[0] < now) {
+        utcOffset = transition[1];
+        tzName = transition[2];
       }
     });
 
