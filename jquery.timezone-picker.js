@@ -93,10 +93,13 @@
     $.each(polygons, function(i, polygon) {
       // Ray casting counter for hit testing.
       var rayTest = 0;
-      var lastPoint = polygon.points[polygon.points.length - 1];
+      var lastPoint = polygon.points.slice(-2);
 
       var coords = [];
-      $.each(polygon.points, function(j, point) {
+      var j = 0;
+      for (j = 0; j < polygon.points.length; j += 2) {
+        var point = polygon.points.slice(j, j + 2);
+
         coords.push(new gmaps.LatLng(point[0], point[1]));
 
         // Ray casting test
@@ -110,7 +113,7 @@
         }
 
         lastPoint = point;
-      });
+      }
 
       allPolygons.push({
         polygon: polygon,

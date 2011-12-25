@@ -90,7 +90,8 @@ def collate_zones(shape_file):
 def convert_points(polygons):
     # Convert {x,y} to [lat,lng], for more compact JSON
     for polygon in polygons:
-        polygon["points"] = map(lambda x: [x["y"], x["x"]], polygon["points"])
+        polygon["points"] = reduce(lambda x,y: x + [y["y"], y["x"]],
+                                   polygon["points"], [])
     return polygons
 
 def reduce_json(jsonString, maxPrecision=6):
@@ -197,5 +198,5 @@ if __name__ == '__main__':
         reduce_json(simplejson.dumps(boxes), 2)
     )
     open(os.path.join(output_dir, "hover_regions.json"), "w").write(
-        reduce_json(simplejson.dumps(hovers), 3)
+        reduce_json(simplejson.dumps(hovers), 2)
     )
