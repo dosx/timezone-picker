@@ -286,6 +286,10 @@
           return;
         }
 
+        if (_map.lastInfoWindow) {
+          _map.lastInfoWindow.close();
+        }
+
         var lat = e.latLng.Qa;
         var lng = e.latLng.Ra;
 

@@ -27,9 +27,10 @@ strokeOpacity: the opacity of the outline of rendered timezones (default 0.7)
 fillColor: the color of the fill of the rendered timezones (default '#ffcccc')
 fillOpacity: the opacity of the outline of rendered timezones (default 0.5)
 jsonRootUrl: the default root URL for the JSON data files (default '/tz_json/')
-onInfoWindow: callback for rendering the contents of the infowindow.
-  onInfoWindow(olsonName, utcOffsetInSeconds, timezoneName)
-onSelected: callback when a timezone is selected via the infowindow. Same parameters as onInfoWindow
+
+showInfoWindow: show an infoWindow for the current selected region.  Takes an HTML string as a parameter
+onSelected: callback when a timezone is selected via the infowindow. Parameters: olsonName, utcOffset (in minutes), tzName (eg. EST, GMT)
+onHover: callback when a timezone is hovered.  Parameters: utcOffset (in minutes)
 
 CSS Classes
 -----------
