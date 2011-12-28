@@ -362,7 +362,7 @@
 
                 if (_options.onHover) {
                   var transition = getCurrentTransition(hoverRegion.transitions);
-                  _options.onHover(transition[1]);
+                  _options.onHover(transition[1], transition[2]);
                 }
               }
             }

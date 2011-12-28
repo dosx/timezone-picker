@@ -44,8 +44,8 @@
           (utcOffset / 60) + '</div>' +
           '</div>');
       },
-      onHover: function(utcOffset) {
-        $('#label').text('UTC Offset: ' + utcOffset + ' minutes');
+      onHover: function(utcOffset, tzNames) {
+        $('#label').text(tzNames.join(',') + ': ' + utcOffset + ' minutes');
       }
     });
   });

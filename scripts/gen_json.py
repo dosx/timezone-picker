@@ -191,10 +191,26 @@ if __name__ == '__main__':
         hover_region = reduce_polygons(zone["polygons"], 1, 0.1, 4, 3, 0.5,
                                        0.05)
 
+        # Merge transitions information for all contained timezones
+        hoverTransitions = []
+        zone_transitions = zone["transitions"].values()
+        for i, transition in enumerate(zone_transitions[0]):
+            tzNames = {}
+            for zone_transition in zone_transitions:
+                tzNames[zone_transition[i][2]] = tzNames.get(
+                    zone_transition[i][2], 0) + 1
+
+            hoverTransitions.append([
+                transition[0],
+                transition[1],
+                map(lambda x: x[0],
+                    sorted(tzNames.iteritems(), key=lambda x:-x[1]))
+            ])
+
         hovers.append({
             "name": zone["name"],
             "hoverRegion": convert_points(hover_region),
-            "transitions": zone["transitions"][zone["name"]]
+            "transitions": hoverTransitions
         })
 
         boxes.append({

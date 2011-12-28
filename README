@@ -30,7 +30,7 @@ jsonRootUrl: the default root URL for the JSON data files (default '/tz_json/')
 
 showInfoWindow: show an infoWindow for the current selected region.  Takes an HTML string as a parameter
 onSelected: callback when a timezone is selected via the infowindow. Parameters: olsonName, utcOffset (in minutes), tzName (eg. EST, GMT)
-onHover: callback when a timezone is hovered.  Parameters: utcOffset (in minutes)
+onHover: callback when a timezone is hovered.  Parameters: utcOffset (in minutes), tzNames (array of strings)
 
 CSS Classes
 -----------
