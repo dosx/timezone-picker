@@ -383,6 +383,7 @@
       hideInfoWindow();
       _options.date = date;
     },
+    hideInfoWindow: hideInfoWindow,
     showInfoWindow: function(content, callback) {
       showInfoWindow(content, callback);
     }
