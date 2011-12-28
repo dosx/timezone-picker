@@ -33,19 +33,35 @@ def collate_zones(shape_file):
         sys.stderr.write("Simpifying %s\n" % name)
         transition_info = []
         tz = pytz.timezone(name)
-        if "_utc_transition_times" not in dir(tz):
-            # Assume no daylight savings
-            td = tz.utcoffset(datetime.datetime(2000, 1, 1))
-            transition_info.append([0, timedelta_to_seconds(td),
-                                     tz.tzname(datetime.datetime(2000, 1, 1))])
-        else:
+        if "_utc_transition_times" in dir(tz):
+            last_info = [sys.maxint, 0, '']
             for i, transition_time in enumerate(tz._utc_transition_times):
+                transition_time = int(time.mktime(transition_time.timetuple()))
                 td = tz._transition_info[i][0]
-                transition_info.append([
-                    int(time.mktime(transition_time.timetuple())),
-                    timedelta_to_seconds(td),
+                info = [
+                    transition_time,
+                    timedelta_to_minutes(td),
                     tz._transition_info[i][2]
-                ])
+                ]
+
+                if transition_time < collation_now:
+                    last_info = info
+                    continue
+
+                # Include the last timezone prior to now
+                if last_info[0] < collation_now:
+                    transition_info.append(last_info)
+
+                transition_info.append(info)
+                last_info = info
+
+        if len(transition_info) == 0:
+            # Assume no daylight savings
+            now = datetime.datetime.now()
+            td = tz.utcoffset(now)
+            transition_info.append([0, timedelta_to_minutes(td),
+                                     tz.tzname(now)])
+
 
         # calculate a collation key based on future timezone transitions
         collation_key = ''
@@ -90,7 +106,7 @@ def collate_zones(shape_file):
 def convert_points(polygons):
     # Convert {x,y} to [lat,lng], for more compact JSON
     for polygon in polygons:
-        polygon["points"] = reduce(lambda x,y: x + [y["y"], y["x"]],
+        polygon["points"] = reduce(lambda x, y: x + [y["y"], y["x"]],
                                    polygon["points"], [])
     return polygons
 
@@ -129,7 +145,7 @@ def reduce_polygons(polygonData, hullAreaThreshold, bufferDistance,
 
     region = []
     # Sort from largest to smallest to faciliate dropping of small regions
-    polygons.sort(key=lambda x: -x.area)
+    polygons.sort(key=lambda x:-x.area)
     for p in polygons:
         # Try to include regions that are big enough, once we have a
         # few representative regions
@@ -155,8 +171,8 @@ def simplify(points):
         "bounds": polygon.bounds
     }
 
-def timedelta_to_seconds(td):
-    return td.days * 24 * 60 * 60 + td.seconds
+def timedelta_to_minutes(td):
+    return td.days * 24 * 60 + td.seconds / 60
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
@@ -177,7 +193,8 @@ if __name__ == '__main__':
 
         hovers.append({
             "name": zone["name"],
-            "hoverRegion": convert_points(hover_region)
+            "hoverRegion": convert_points(hover_region),
+            "transitions": zone["transitions"][zone["name"]]
         })
 
         boxes.append({

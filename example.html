@@ -18,22 +18,24 @@
     };
 
     $("#zonepicker").timezonePicker({
-      initialLat: 40.71,
-      initialLng: -74.00,
-      initialZoom: 4,
-      onSelected: function(zone) {
-        alert('Timezone Selected: ' + zone);
-      },
-      onInfoWindow: function(olsonName, utcOffset, tzName) {
+      initialLat: 20,
+      initialLng: 0,
+      initialZoom: 2,
+      onSelected: function(olsonName, utcOffset, tzName) {
         var now = new Date();
         var delta = now.setTime(now.getTime() +
-          (now.getTimezoneOffset() + utcOffset / 60) * 60 * 1000);
-        return '<h1>' + olsonName + '<br/>' +
+          (now.getTimezoneOffset() + utcOffset) * 60 * 1000);
+
+        $("#zonepicker").timezonePicker('showInfoWindow', '<h1>' +
+          olsonName + '<br/>' +
           pad(now.getHours()) + ':' +
           pad(now.getMinutes()) + ':' +
           pad(now.getSeconds()) + '<br/>' +
-          '[' + tzName + ' ' + (utcOffset / 60 / 60) + ']'
-          '</h1>';
+          '[' + tzName + ' ' + (utcOffset / 60) + ']' +
+          '</h1>');
+      },
+      onHover: function(utcOffset) {
+        $('#label').text('UTC Offset: ' + utcOffset + ' minutes');
       }
     });
   });
@@ -49,7 +51,10 @@
   </style>
 </head>
 <body>
-  <div id="zonepicker" style="width: 100%; height: 100%;">
-  </div>
+  <center>
+    <div id="zonepicker" style="width: 960px; height: 500px;">
+    </div>
+    <div id="label"></div>
+  </center>
 </body>
 </html>

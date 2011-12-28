@@ -3,7 +3,8 @@
   var _self;
 
   var _boundingBoxes;
-  var _currentSelectedRegion;
+  var _selectedRegionKey;
+  var _selectedPolygon;
   var _map;
   var _mapZones = {};
   var _transitions = {};
@@ -20,7 +21,16 @@
   var gmaps = google.maps;
 
   // Forward declarations to satisfy jshint
-  var hideLoader, hitTestAndConvert, showInfoWindow, slugifyName;
+  var hideLoader, hitTestAndConvert, onSelected, selectPolygonZone,
+    showInfoWindow, slugifyName;
+
+  var clearHover = function() {
+    $.each(_hoverPolygons, function(i, p) {
+      p.setMap(null);
+    });
+
+    _hoverPolygons = [];
+  };
 
   var clearZones = function() {
     $.each(_mapZones, function(i, zone) {
@@ -55,7 +65,7 @@
       var result = hitTestAndConvert(data.polygons, lat, lng);
 
       if (result.inZone) {
-        _currentSelectedRegion = name;
+        _selectedRegionKey = name;
         $.each(result.allPolygons, function(i, polygonInfo) {
           var mapPolygon = new gmaps.Polygon({
             paths: polygonInfo.coords,
@@ -68,17 +78,35 @@
           mapPolygon.setMap(_map);
 
           gmaps.event.addListener(mapPolygon, 'click', function() {
-            showInfoWindow(polygonInfo.polygon);
+            selectPolygonZone(polygonInfo.polygon);
           });
+
+          gmaps.event.addListener(mapPolygon, 'mousemove', clearHover);
 
           _mapZones[name].push(mapPolygon);
         });
 
-        showInfoWindow(result.selectedPolygon);
+        selectPolygonZone(result.selectedPolygon);
       }
     }).error(function() {
       console.warn(arguments);
     });
+  };
+
+  var getCurrentTransition = function(transitions) {
+    if (transitions.length === 1) {
+      return transitions[0];
+    }
+
+    var now = new Date().getTime() / 1000;
+    var selected = null;
+    $.each(transitions, function(i, transition) {
+      if (transition[0] < now && transitions[i + 1][0] > now) {
+        selected = transition;
+      }
+    });
+
+    return selected;
   };
 
   hideLoader = function() {
@@ -135,80 +163,51 @@
     };
   };
 
-  var onInfoWindow = function(olsonName, utcOffset, tzName) {
-    return '<h1>' + olsonName + '<br/>[' + tzName + ':' +
-      (utcOffset / 60 / 60) + ']</h1>';
+  selectPolygonZone = function(polygon) {
+    _selectedPolygon = polygon;
+
+    var transition = getCurrentTransition(
+      _transitions[polygon.name]);
+
+    var olsonName = polygon.name;
+    var utcOffset = transition[1];
+    var tzName = transition[2];
+
+    if (_options.onSelected) {
+      _options.onSelected(olsonName, utcOffset, tzName);
+    }
+    else {
+      showInfoWindow('<h1>' + olsonName + '<br/>[' + tzName + ':' +
+      (utcOffset / 60) + ']</h1>');
+    }
   };
 
-  showInfoWindow = function(polygon) {
+  showInfoWindow = function(content) {
     // Hack to get the centroid of the largest polygon - we just check
     // which has the most edges
     var centroid;
     var maxPoints = 0;
-    if (polygon.points.length > maxPoints) {
-      centroid = polygon.centroid;
-      maxPoints = polygon.points.length;
+    if (_selectedPolygon.points.length > maxPoints) {
+      centroid = _selectedPolygon.centroid;
+      maxPoints = _selectedPolygon.points.length;
     }
 
     if (_map.lastInfoWindow) {
       _map.lastInfoWindow.close();
     }
 
-    var selectedZoneName = polygon.name;
-    var id = slugifyName(selectedZoneName);
-
-    // Figure out the UTC offset
-    var transitions = _transitions[selectedZoneName];
-    var now = new Date().getTime();
-    var utcOffset = 0;
-    var tzName = '';
-    $.each(transitions, function(i, transition) {
-      if (transition[0] < now) {
-        utcOffset = transition[1];
-        tzName = transition[2];
-      }
-    });
-
     var infowindow = new gmaps.InfoWindow({
-      content: '<div id="' + id + '" class="timezone-picker-infowindow">' +
-        _options.onInfoWindow(selectedZoneName, utcOffset, tzName) +
-        '<div class="timezone-picker-buttons">' +
-        '<button>Use Timezone</button><button>Cancel</button>' +
-        '</div>' +
-        '</div>',
+      content: '<div id="timezone_picker_infowindow" class="timezone-picker-infowindow">' +
+      content +
+      '</div>',
       maxWidth: 500
     });
 
     gmaps.event.addListener(infowindow, 'domready', function() {
       // HACK: Put rounded corners on the infowindow
-      $('#' + id).parent().parent().parent().prev().css('border-radius',
-        '5px');
-      $('#' + id + ' button:eq(0)').click(function(e) {
-        if (e.which > 1) {
-          return;
-        }
-
-        if (_options.onSelected) {
-          _options.onSelected(selectedZoneName, utcOffset, tzName);
-        }
-
-        e.preventDefault();
-        return false;
-      });
-
-      $('#' + id + ' button:eq(1)').click(function(e) {
-        if (e.which > 1) {
-          return;
-        }
-        infowindow.close();
-        e.preventDefault();
-        return false;
-      });
+      $('#timezone_picker_infowindow').parent().parent().parent().prev().css('border-radius', '5px');
     });
-    infowindow.setPosition(new gmaps.LatLng(
-      centroid[1],
-      centroid[0]
-    ));
+    infowindow.setPosition(new gmaps.LatLng(centroid[1], centroid[0]));
     infowindow.open(_map);
 
     _map.lastInfoWindow = infowindow;
@@ -216,10 +215,12 @@
 
   var showLoader = function() {
     _loader = $('<div style="background: url(' + _maskPng +
-      ');z-index:10000;position: absolute;top:0;left:0;">' +
-      '<img style="position:absolute;' +
-      'top:50%; left:50%;margin-top:-8px;margin-left:-8px" ' +
-      'src="' + _loaderGif + '" /></div>');
+    ');z-index:10000;position: absolute;top:0;left:0;">' +
+    '<img style="position:absolute;' +
+    'top:50%; left:50%;margin-top:-8px;margin-left:-8px" ' +
+    'src="' +
+    _loaderGif +
+    '" /></div>');
     _loader.height(_self.height()).width(_self.width());
     _self.append(_loader);
   };
@@ -243,7 +244,6 @@
       _options.fillColor = _options.fillColor || '#ffcccc';
       _options.fillOpacity = _options.fillOpacity || 0.5;
       _options.jsonRootUrl = _options.jsonRootUrl || 'tz_json/';
-      _options.onInfoWindow = _options.onInfoWindow || onInfoWindow;
 
       if (typeof _options.hoverRegions === 'undefined') {
         _options.hoverRegions = true;
@@ -275,7 +275,7 @@
         $.get(_options.jsonRootUrl + 'hover_regions.json', function(data) {
           var hoverData = typeof data === 'string' ? JSON.parse(data) : data;
           $.each(hoverData, function(i, v) {
-            _hoverRegions[v.name] = v.hoverRegion;
+            _hoverRegions[v.name] = v;
           });
           checkLoading();
         });
@@ -293,7 +293,8 @@
         $.each(_boundingBoxes, function(i, v) {
           var bb = v.boundingBox;
           if (lat > bb.ymin && lat < bb.ymax &&
-            lng > bb.xmin && lng < bb.xmax) {
+          lng > bb.xmin &&
+          lng < bb.xmax) {
             candidates.push(slugifyName(v.name));
           }
         });
@@ -325,21 +326,18 @@
           $.each(_boundingBoxes, function(i, v) {
             var bb = v.boundingBox;
             if (lat > bb.ymin && lat < bb.ymax &&
-              lng > bb.xmin && lng < bb.xmax) {
+            lng > bb.xmin &&
+            lng < bb.xmax) {
               var hoverRegion = _hoverRegions[v.name];
               if (!hoverRegion) {
                 return;
               }
 
-              var result = hitTestAndConvert(hoverRegion, lat, lng);
+              var result = hitTestAndConvert(hoverRegion.hoverRegion, lat, lng);
               var slugName = slugifyName(v.name);
               if (result.inZone && slugName !== _currentHoverRegion &&
-                slugName !== _currentSelectedRegion)  {
-                $.each(_hoverPolygons, function(i, p) {
-                  p.setMap(null);
-                });
-
-                _hoverPolygons = [];
+                slugName !== _selectedRegionKey) {
+                clearHover();
                 _currentHoverRegion = slugName;
 
                 $.each(result.allPolygons, function(i, polygonInfo) {
@@ -353,11 +351,15 @@
                   });
                   mapPolygon.setMap(_map);
 
-                  gmaps.event.addListener(mapPolygon, 'click',
-                  mapClickHandler);
+                  gmaps.event.addListener(mapPolygon, 'click', mapClickHandler);
 
                   _hoverPolygons.push(mapPolygon);
                 });
+
+                if (_options.onHover) {
+                  var transition = getCurrentTransition(hoverRegion.transitions);
+                  _options.onHover(transition[1]);
+                }
               }
             }
           });
@@ -365,7 +367,10 @@
       }
 
       gmaps.event.addListener(_map, 'click', mapClickHandler);
-     }
+    },
+    showInfoWindow: function(content) {
+      showInfoWindow(content);
+    }
   };
 
   $.fn.timezonePicker = function(method) {
