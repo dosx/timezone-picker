@@ -98,7 +98,7 @@
       return transitions[0];
     }
 
-    var now = new Date().getTime() / 1000;
+    var now = _options.date.getTime() / 1000;
     var selected = null;
     $.each(transitions, function(i, transition) {
       if (transition[0] < now && transitions[i + 1][0] > now) {
@@ -107,6 +107,12 @@
     });
 
     return selected;
+  };
+
+  var hideInfoWindow = function() {
+    if (_map.lastInfoWindow) {
+      _map.lastInfoWindow.close();
+    }
   };
 
   hideLoader = function() {
@@ -182,7 +188,7 @@
     }
   };
 
-  showInfoWindow = function(content) {
+  showInfoWindow = function(content, callback) {
     // Hack to get the centroid of the largest polygon - we just check
     // which has the most edges
     var centroid;
@@ -192,9 +198,7 @@
       maxPoints = _selectedPolygon.points.length;
     }
 
-    if (_map.lastInfoWindow) {
-      _map.lastInfoWindow.close();
-    }
+    hideInfoWindow();
 
     var infowindow = new gmaps.InfoWindow({
       content: '<div id="timezone_picker_infowindow" class="timezone-picker-infowindow">' +
@@ -206,6 +210,10 @@
     gmaps.event.addListener(infowindow, 'domready', function() {
       // HACK: Put rounded corners on the infowindow
       $('#timezone_picker_infowindow').parent().parent().parent().prev().css('border-radius', '5px');
+
+      if (callback) {
+        callback.apply($('#timezone_picker_infowindow'));
+      }
     });
     infowindow.setPosition(new gmaps.LatLng(centroid[1], centroid[0]));
     infowindow.open(_map);
@@ -244,6 +252,7 @@
       _options.fillColor = _options.fillColor || '#ffcccc';
       _options.fillOpacity = _options.fillOpacity || 0.5;
       _options.jsonRootUrl = _options.jsonRootUrl || 'tz_json/';
+      _options.date = _options.date || new Date();
 
       if (typeof _options.hoverRegions === 'undefined') {
         _options.hoverRegions = true;
@@ -286,9 +295,7 @@
           return;
         }
 
-        if (_map.lastInfoWindow) {
-          _map.lastInfoWindow.close();
-        }
+        hideInfoWindow();
 
         var lat = e.latLng.Qa;
         var lng = e.latLng.Ra;
@@ -372,8 +379,12 @@
 
       gmaps.event.addListener(_map, 'click', mapClickHandler);
     },
-    showInfoWindow: function(content) {
-      showInfoWindow(content);
+    setDate: function(date) {
+      hideInfoWindow();
+      _options.date = date;
+    },
+    showInfoWindow: function(content, callback) {
+      showInfoWindow(content, callback);
     }
   };
 
