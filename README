@@ -28,9 +28,16 @@ fillColor: the color of the fill of the rendered timezones (default '#ffcccc')
 fillOpacity: the opacity of the outline of rendered timezones (default 0.5)
 jsonRootUrl: the default root URL for the JSON data files (default '/tz_json/')
 
-showInfoWindow: show an infoWindow for the current selected region.  Takes an HTML string as a parameter
 onSelected: callback when a timezone is selected via the infowindow. Parameters: olsonName, utcOffset (in minutes), tzName (eg. EST, GMT)
 onHover: callback when a timezone is hovered.  Parameters: utcOffset (in minutes), tzNames (array of strings)
+onReady: callback when all the data files are loaded
+
+Methods
+-------
+showInfoWindow(htmlString): show an infoWindow for the current selected region.  Takes an HTML string as a parameter
+hideInfoWindow(): hide it
+setDate(Date): set the "relative" date for the picker for proper timezone names (eg. EST vs EDT)
+selectZone(olsonName): programmatically select a timezone
 
 CSS Classes
 -----------

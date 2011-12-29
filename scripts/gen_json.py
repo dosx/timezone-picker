@@ -168,7 +168,8 @@ def simplify(points):
         "points": map(lambda x: {"x": x[0], "y": x[1]},
             polygon.exterior.coords),
         "centroid": (polygon.centroid.x, polygon.centroid.y),
-        "bounds": polygon.bounds
+        "bounds": polygon.bounds,
+        "area": polygon.area
     }
 
 def timedelta_to_minutes(td):
@@ -213,9 +214,26 @@ if __name__ == '__main__':
             "transitions": hoverTransitions
         })
 
+        # Get a centroid for the largest polygon in each zone
+        zone_centroids = {}
+        for polygon in zone["polygons"]:
+            zone_centroid = zone_centroids.get(polygon["name"], {
+                "centroid": (0, 0),
+                "area": 0
+            })
+
+            if polygon["area"] > zone_centroid["area"]:
+                zone_centroids[polygon["name"]] = {
+                    "centroid": polygon["centroid"],
+                    "area": polygon["area"]
+                }
+
         boxes.append({
             "name": zone["name"],
-            "boundingBox": zone["bounding_box"]
+            "boundingBox": zone["bounding_box"],
+            "zoneCentroids": dict(map(
+                lambda x: (x[0], x[1]["centroid"]), zone_centroids.iteritems()
+            ))
         })
 
         filename = re.sub(r'[^a-z0-9]+', '-', zone["name"].lower())

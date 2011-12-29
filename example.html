@@ -28,10 +28,9 @@
           (adjusted.getTimezoneOffset() + utcOffset) * 60 * 1000);
 
         $("#zonepicker").timezonePicker('showInfoWindow', '<h2>' +
-          tzName + '</h2>' +
+          olsonName.split('/').slice(-1)[0].replace('_', ' ') + ' ' +
+          '(' + tzName + ')</h2>' +
           '<div class="metadata">' +
-          '<div>Nearest City: ' +
-          olsonName.split('/').slice(-1)[0].replace('_', ' ')  + '</div>' +
           '<div>Current Time: ' +
           pad(adjusted.getHours()) + ':' +
           pad(adjusted.getMinutes()) + ':' +
@@ -43,6 +42,9 @@
           '<div>UTC Offset (in hours): ' +
           (utcOffset / 60) + '</div>' +
           '</div>');
+      },
+      onReady: function() {
+        $("#zonepicker").timezonePicker('selectZone', 'America/New_York');
       },
       onHover: function(utcOffset, tzNames) {
         $('#label').text(tzNames.join(',') + ': ' + utcOffset + ' minutes');

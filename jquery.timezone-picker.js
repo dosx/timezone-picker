@@ -3,6 +3,7 @@
   var _self;
 
   var _boundingBoxes;
+  var _zoneCentroids = {};
   var _selectedRegionKey;
   var _selectedPolygon;
   var _map;
@@ -169,6 +170,45 @@
     };
   };
 
+  var mapClickHandler = function(e) {
+    if (_needsLoader > 0) {
+      return;
+    }
+
+    hideInfoWindow();
+
+    var lat = e.latLng.Qa;
+    var lng = e.latLng.Ra;
+
+    var candidates = [];
+    $.each(_boundingBoxes, function(i, v) {
+      var bb = v.boundingBox;
+      if (lat > bb.ymin && lat < bb.ymax &&
+      lng > bb.xmin &&
+      lng < bb.xmax) {
+        candidates.push(slugifyName(v.name));
+      }
+    });
+
+    _needsLoader = candidates.length;
+    setTimeout(function() {
+      if (_needsLoader > 0) {
+        showLoader();
+      }
+    }, 500);
+
+    clearZones();
+    $.each(candidates, function(i, v) {
+      drawZone(v, lat, lng, function() {
+        $.each(_hoverPolygons, function(i, p) {
+          p.setMap(null);
+        });
+        _hoverPolygons = [];
+        _currentHoverRegion = null;
+      });
+    });
+  };
+
   selectPolygonZone = function(polygon) {
     _selectedPolygon = polygon;
 
@@ -271,12 +311,19 @@
         loadCount--;
         if (loadCount === 0) {
           hideLoader();
+
+          if (_options.onReady) {
+            _options.onReady();
+          }
         }
       };
 
       showLoader();
       $.get(_options.jsonRootUrl + 'bounding_boxes.json', function(data) {
         _boundingBoxes = typeof data === 'string' ? JSON.parse(data) : data;
+        $.each(_boundingBoxes, function(i, bb) {
+          $.extend(_zoneCentroids, bb.zoneCentroids);
+        });
         checkLoading();
       });
 
@@ -289,45 +336,6 @@
           checkLoading();
         });
       }
-
-      var mapClickHandler = function(e) {
-        if (_needsLoader > 0) {
-          return;
-        }
-
-        hideInfoWindow();
-
-        var lat = e.latLng.Qa;
-        var lng = e.latLng.Ra;
-
-        var candidates = [];
-        $.each(_boundingBoxes, function(i, v) {
-          var bb = v.boundingBox;
-          if (lat > bb.ymin && lat < bb.ymax &&
-          lng > bb.xmin &&
-          lng < bb.xmax) {
-            candidates.push(slugifyName(v.name));
-          }
-        });
-
-        _needsLoader = candidates.length;
-        setTimeout(function() {
-          if (_needsLoader > 0) {
-            showLoader();
-          }
-        }, 500);
-
-        clearZones();
-        $.each(candidates, function(i, v) {
-          drawZone(v, lat, lng, function() {
-            $.each(_hoverPolygons, function(i, p) {
-              p.setMap(null);
-            });
-            _hoverPolygons = [];
-            _currentHoverRegion = null;
-          });
-        });
-      };
 
       if (_options.hoverRegions) {
         gmaps.event.addListener(_map, 'mousemove', function(e) {
@@ -386,6 +394,17 @@
     hideInfoWindow: hideInfoWindow,
     showInfoWindow: function(content, callback) {
       showInfoWindow(content, callback);
+    },
+    selectZone: function(olsonName) {
+      var centroid = _zoneCentroids[olsonName];
+      if (centroid) {
+        mapClickHandler({
+          latLng: {
+            Qa: centroid[1],
+            Ra: centroid[0]
+          }
+        });
+      }
     }
   };
 
