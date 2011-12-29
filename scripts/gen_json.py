@@ -228,6 +228,9 @@ if __name__ == '__main__':
                     "area": polygon["area"]
                 }
 
+            # Don't need this anymore, so purge it to save some JSON space
+            del polygon["area"]
+
         boxes.append({
             "name": zone["name"],
             "boundingBox": zone["bounding_box"],
