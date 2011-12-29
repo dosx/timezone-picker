@@ -10,39 +10,10 @@
 
   <script>
   $(function() {
-    var pad = function(d) {
-      if (d < 10) {
-        return '0' + d;
-      }
-      return d.toString();
-    };
-
     $("#zonepicker").timezonePicker({
       initialLat: 20,
       initialLng: 0,
       initialZoom: 2,
-      onSelected: function(olsonName, utcOffset, tzName) {
-        var now = new Date();
-        var adjusted = new Date();
-        adjusted.setTime(adjusted.getTime() +
-          (adjusted.getTimezoneOffset() + utcOffset) * 60 * 1000);
-
-        $("#zonepicker").timezonePicker('showInfoWindow', '<h2>' +
-          olsonName.split('/').slice(-1)[0].replace('_', ' ') + ' ' +
-          '(' + tzName + ')</h2>' +
-          '<div class="metadata">' +
-          '<div>Current Time: ' +
-          pad(adjusted.getHours()) + ':' +
-          pad(adjusted.getMinutes()) + ':' +
-          pad(adjusted.getSeconds()) + '</div>' +
-          '<div>Your Time: ' +
-          pad(now.getHours()) + ':' +
-          pad(now.getMinutes()) + ':' +
-          pad(now.getSeconds()) + '</div>' +
-          '<div>UTC Offset (in hours): ' +
-          (utcOffset / 60) + '</div>' +
-          '</div>');
-      },
       onReady: function() {
         $("#zonepicker").timezonePicker('selectZone', 'America/New_York');
       },
@@ -52,18 +23,17 @@
     });
   });
   </script>
+
   <style>
     .timezone-picker-infowindow {
+      color: #444;
       font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
       text-align: left;
     }
 
     .timezone-picker-infowindow h2 {
       margin: 4px 0;
-    }
-
-    .timezone-picker-infowindow .metadata {
-      color: #444;
     }
 
   </style>

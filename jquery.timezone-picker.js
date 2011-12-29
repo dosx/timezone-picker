@@ -223,8 +223,33 @@
       _options.onSelected(olsonName, utcOffset, tzName);
     }
     else {
-      showInfoWindow('<h1>' + olsonName + '<br/>[' + tzName + ':' +
-      (utcOffset / 60) + ']</h1>');
+      var pad = function(d) {
+        if (d < 10) {
+          return '0' + d;
+        }
+        return d.toString();
+      };
+
+      var now = new Date();
+      var adjusted = new Date();
+      adjusted.setTime(adjusted.getTime() +
+        (adjusted.getTimezoneOffset() + utcOffset) * 60 * 1000);
+
+      showInfoWindow('<h2>' +
+        olsonName.split('/').slice(-1)[0].replace('_', ' ') + ' ' +
+        '(' + tzName + ')</h2>' +
+        '<div class="metadata">' +
+        '<div>Current Time: ' +
+        pad(adjusted.getHours()) + ':' +
+        pad(adjusted.getMinutes()) + ':' +
+        pad(adjusted.getSeconds()) + '</div>' +
+        '<div>Your Time: ' +
+        pad(now.getHours()) + ':' +
+        pad(now.getMinutes()) + ':' +
+        pad(now.getSeconds()) + '</div>' +
+        '<div>UTC Offset (in hours): ' +
+        (utcOffset / 60) + '</div>' +
+        '</div>');
     }
   };
 
@@ -243,8 +268,7 @@
     var infowindow = new gmaps.InfoWindow({
       content: '<div id="timezone_picker_infowindow" class="timezone-picker-infowindow">' +
       content +
-      '</div>',
-      maxWidth: 500
+      '</div>'
     });
 
     gmaps.event.addListener(infowindow, 'domready', function() {
