@@ -4,7 +4,6 @@ Prerequisites
 -------------
   - jQuery
   - Google Maps Javascript API v3
-  - Python 2.6+
 
 Usage
 -----
@@ -53,6 +52,7 @@ This plugin uses a bunch of timezone data files on a web server.
   - hover_regions.json: an array of polygons representing hover regions for each timezone
   - polygons/*.json: polygon definitions for each timezone
 
+Requires Python 2.6+
 Requires libgeos-dev (sudo apt-get install libgeos-dev)
 Requires shapely (sudo pip install shapely)
 Requires pytz (sudo pip install pytz)
