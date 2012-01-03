@@ -19,7 +19,7 @@
   var _maskPng;
   var _needsLoader = 0;
 
-  var gmaps = google.maps;
+  var gmaps;
 
   // Forward declarations to satisfy jshint
   var hideLoader, hitTestAndConvert, onSelected, selectPolygonZone,
@@ -441,6 +441,7 @@
   };
 
   $.fn.timezonePicker = function(method) {
+    gmaps = google.maps;
     if (methods[method]) {
       return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
     }
