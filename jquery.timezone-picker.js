@@ -107,6 +107,12 @@
       }
     });
 
+    // If we couldn't find a matching transition, just use the first one
+    // NOTE: This will sometimes be wrong for events in the past
+    if (!selected) {
+      selected = transitions[0];
+    }
+
     return selected;
   };
 
