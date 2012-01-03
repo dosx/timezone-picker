@@ -19,6 +19,10 @@
       },
       onHover: function(utcOffset, tzNames) {
         $('#label').text(tzNames.join(',') + ': ' + utcOffset + ' minutes');
+      },
+      mapOptions: {
+        maxZoom: 6,
+        minZoom: 2
       }
     });
   });

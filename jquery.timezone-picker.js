@@ -324,16 +324,18 @@
       _options.jsonRootUrl = _options.jsonRootUrl || 'tz_json/';
       _options.date = _options.date || new Date();
 
+      _options.mapOptions = $.extend({
+        zoom: _options.initialZoom,
+        mapTypeId: gmaps.MapTypeId.ROADMAP,
+        center: new gmaps.LatLng(_options.initialLat, _options.initialLng)
+      }, _options.mapOptions);
+
       if (typeof _options.hoverRegions === 'undefined') {
         _options.hoverRegions = true;
       }
 
       // Create the maps instance
-      _map = new gmaps.Map(_self.get(0), {
-        zoom: _options.initialZoom,
-        mapTypeId: gmaps.MapTypeId.ROADMAP,
-        center: new gmaps.LatLng(_options.initialLat, _options.initialLng)
-      });
+      _map = new gmaps.Map(_self.get(0), _options.mapOptions);
 
       // Load the necessary data files
       var loadCount = _options.hoverRegions ? 2 : 1;
