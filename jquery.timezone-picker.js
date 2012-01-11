@@ -184,7 +184,7 @@
     hideInfoWindow();
 
     var lat = e.latLng.Qa;
-    var lng = e.latLng.Ra;
+    var lng = e.latLng.Ra || e.latLng.Pa;
 
     var candidates = [];
     $.each(_boundingBoxes, function(i, v) {
