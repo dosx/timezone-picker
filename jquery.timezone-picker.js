@@ -183,8 +183,8 @@
 
     hideInfoWindow();
 
-    var lat = e.latLng.Qa;
-    var lng = e.latLng.Ra || e.latLng.Pa;
+    var lat = e.latLng.lat();
+    var lng = e.latLng.lng();
 
     var candidates = [];
     $.each(_boundingBoxes, function(i, v) {
@@ -371,8 +371,8 @@
 
       if (_options.hoverRegions) {
         gmaps.event.addListener(_map, 'mousemove', function(e) {
-          var lat = e.latLng.Qa;
-          var lng = e.latLng.Ra;
+          var lat = e.latLng.lat();
+          var lng = e.latLng.lng();
 
           $.each(_boundingBoxes, function(i, v) {
             var bb = v.boundingBox;
@@ -432,8 +432,12 @@
       if (centroid) {
         mapClickHandler({
           latLng: {
-            Qa: centroid[1],
-            Ra: centroid[0]
+            lat: function() {
+              return centroid[1];
+            },
+            lng: function() {
+              return centroid[0];
+            }
           }
         });
       }
