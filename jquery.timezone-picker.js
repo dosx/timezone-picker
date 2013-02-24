@@ -6,7 +6,7 @@
   var _zoneCentroids = {};
   var _selectedRegionKey;
   var _selectedPolygon;
-  var _map;
+  var _mapper;
   var _mapZones = {};
   var _transitions = {};
 
@@ -20,9 +20,83 @@
   var _needsLoader = 0;
 
   var gmaps;
+  var GoogleMaps = function(el, mouseClickHandler, mouseMoveHandler, mapOptions) {
+    var _map;
+
+    // Create the maps instance
+    _map = new gmaps.Map(el, mapOptions);
+    gmaps.event.addListener(_map, 'click', mouseClickHandler);
+    if (mouseMoveHandler) {
+      gmaps.event.addListener(_map, 'mousemove', mouseMoveHandler);
+    }
+
+    var addPolygon = function(coords, stroke, fill, clickHandler, mouseMoveHandler) {
+      var mapPolygon = new gmaps.Polygon({
+        paths: coords,
+        strokeColor: stroke.color,
+        strokeOpacity: stroke.opacity,
+        strokeWeight: stroke.width,
+        fillColor: fill.color,
+        fillOpacity: fill.opacity
+      });
+      mapPolygon.setMap(_map);
+
+      gmaps.event.addListener(mapPolygon, 'click', clickHandler);
+
+      if (mouseMoveHandler) {
+        gmaps.event.addListener(mapPolygon, 'mousemove', mouseMoveHandler);
+      }
+
+      return mapPolygon;
+    };
+
+    var createPoint = function(lat, lng) {
+      return new gmaps.LatLng(lat, lng);
+    };
+
+    var hideInfoWindow = function() {
+      if (_map.lastInfoWindow) {
+        _map.lastInfoWindow.close();
+      }
+    };
+
+    var removePolygon = function(mapPolygon) {
+      mapPolygon.setMap(null);
+    };
+
+    var showInfoWindow = function(pos, content, callback) {
+      var infowindow = new gmaps.InfoWindow({
+        content: '<div id="timezone_picker_infowindow" class="timezone-picker-infowindow">' +
+        content +
+        '</div>'
+      });
+
+      gmaps.event.addListener(infowindow, 'domready', function() {
+        // HACK: Put rounded corners on the infowindow
+        $('#timezone_picker_infowindow').parent().parent().parent().prev().css('border-radius', 
+            '5px');
+
+        if (callback) {
+          callback.apply($('#timezone_picker_infowindow'));
+        }
+      });
+      infowindow.setPosition(pos);
+      infowindow.open(_map);
+
+      _map.lastInfoWindow = infowindow;
+    };
+
+    return {
+      addPolygon: addPolygon,
+      createPoint: createPoint,
+      hideInfoWindow: hideInfoWindow,
+      removePolygon: removePolygon,
+      showInfoWindow: showInfoWindow
+    };
+  };
 
   // Forward declarations to satisfy jshint
-  var hideLoader, hitTestAndConvert, onSelected, selectPolygonZone,
+  var hideLoader, hitTestAndConvert, selectPolygonZone,
     showInfoWindow, slugifyName;
 
   var clearHover = function() {
@@ -68,22 +142,17 @@
       if (result.inZone) {
         _selectedRegionKey = name;
         $.each(result.allPolygons, function(i, polygonInfo) {
-          var mapPolygon = new gmaps.Polygon({
-            paths: polygonInfo.coords,
-            strokeColor: '#ff0000',
-            strokeOpacity: 0.7,
-            strokeWeight: 1,
-            fillColor: '#ffcccc',
-            fillOpacity: 0.5
-          });
-          mapPolygon.setMap(_map);
-
-          gmaps.event.addListener(mapPolygon, 'click', function() {
+          var mapPolygon = _mapper.addPolygon(polygonInfo.coords, {
+            color: '#ff0000',
+            opacity: 0.7,
+            width: 1
+          }, {
+            color: '#ffcccc',
+            opacity: 0.5
+          }, function() {
             selectPolygonZone(polygonInfo.polygon);
-          });
-
-          gmaps.event.addListener(mapPolygon, 'mousemove', clearHover);
-
+          }, clearHover);
+            
           _mapZones[name].push(mapPolygon);
         });
 
@@ -117,9 +186,7 @@
   };
 
   var hideInfoWindow = function() {
-    if (_map.lastInfoWindow) {
-      _map.lastInfoWindow.close();
-    }
+    _mapper.hideInfoWindow();
   };
 
   hideLoader = function() {
@@ -141,7 +208,7 @@
       for (j = 0; j < polygon.points.length; j += 2) {
         var point = polygon.points.slice(j, j + 2);
 
-        coords.push(new gmaps.LatLng(point[0], point[1]));
+        coords.push(_mapper.createPoint(point[0], point[1]));
 
         // Ray casting test
         if ((lastPoint[0] <= lat && point[0] >= lat) ||
@@ -215,6 +282,49 @@
     });
   };
 
+  var mouseMoveHandler = function(e) {
+    var lat = e.latLng.lat();
+    var lng = e.latLng.lng();
+
+    $.each(_boundingBoxes, function(i, v) {
+      var bb = v.boundingBox;
+      if (lat > bb.ymin && lat < bb.ymax &&
+      lng > bb.xmin &&
+      lng < bb.xmax) {
+        var hoverRegion = _hoverRegions[v.name];
+        if (!hoverRegion) {
+          return;
+        }
+
+        var result = hitTestAndConvert(hoverRegion.hoverRegion, lat, lng);
+        var slugName = slugifyName(v.name);
+        if (result.inZone && slugName !== _currentHoverRegion &&
+          slugName !== _selectedRegionKey) {
+          clearHover();
+          _currentHoverRegion = slugName;
+
+          $.each(result.allPolygons, function(i, polygonInfo) {
+            var mapPolygon = _mapper.addPolygon(polygonInfo.coords, {
+              color: '#444444',
+              opacity: 0.7,
+              width: 1
+            }, {
+              color: '#888888',
+              opacity: 0.5
+            }, mapClickHandler, null);
+
+            _hoverPolygons.push(mapPolygon);
+          });
+
+          if (_options.onHover) {
+            var transition = getCurrentTransition(hoverRegion.transitions);
+            _options.onHover(transition[1], transition[2]);
+          }
+        }
+      }
+    });
+  };
+
   selectPolygonZone = function(polygon) {
     _selectedPolygon = polygon;
 
@@ -271,24 +381,8 @@
 
     hideInfoWindow();
 
-    var infowindow = new gmaps.InfoWindow({
-      content: '<div id="timezone_picker_infowindow" class="timezone-picker-infowindow">' +
-      content +
-      '</div>'
-    });
-
-    gmaps.event.addListener(infowindow, 'domready', function() {
-      // HACK: Put rounded corners on the infowindow
-      $('#timezone_picker_infowindow').parent().parent().parent().prev().css('border-radius', '5px');
-
-      if (callback) {
-        callback.apply($('#timezone_picker_infowindow'));
-      }
-    });
-    infowindow.setPosition(new gmaps.LatLng(centroid[1], centroid[0]));
-    infowindow.open(_map);
-
-    _map.lastInfoWindow = infowindow;
+    _mapper.showInfoWindow(_mapper.createPoint(centroid[1], centroid[0]), content,
+          callback);
   };
 
   var showLoader = function() {
@@ -334,8 +428,10 @@
         _options.hoverRegions = true;
       }
 
-      // Create the maps instance
-      _map = new gmaps.Map(_self.get(0), _options.mapOptions);
+      _mapper = new GoogleMaps(_self.get(0), 
+          mapClickHandler,
+          _options.hoverRegions ? mouseMoveHandler : null,
+          _options.mapOptions);
 
       // Load the necessary data files
       var loadCount = _options.hoverRegions ? 2 : 1;
@@ -368,56 +464,6 @@
           checkLoading();
         });
       }
-
-      if (_options.hoverRegions) {
-        gmaps.event.addListener(_map, 'mousemove', function(e) {
-          var lat = e.latLng.lat();
-          var lng = e.latLng.lng();
-
-          $.each(_boundingBoxes, function(i, v) {
-            var bb = v.boundingBox;
-            if (lat > bb.ymin && lat < bb.ymax &&
-            lng > bb.xmin &&
-            lng < bb.xmax) {
-              var hoverRegion = _hoverRegions[v.name];
-              if (!hoverRegion) {
-                return;
-              }
-
-              var result = hitTestAndConvert(hoverRegion.hoverRegion, lat, lng);
-              var slugName = slugifyName(v.name);
-              if (result.inZone && slugName !== _currentHoverRegion &&
-                slugName !== _selectedRegionKey) {
-                clearHover();
-                _currentHoverRegion = slugName;
-
-                $.each(result.allPolygons, function(i, polygonInfo) {
-                  var mapPolygon = new gmaps.Polygon({
-                    paths: polygonInfo.coords,
-                    strokeColor: '#444444',
-                    strokeOpacity: 0.7,
-                    strokeWeight: 1,
-                    fillColor: '#888888',
-                    fillOpacity: 0.5
-                  });
-                  mapPolygon.setMap(_map);
-
-                  gmaps.event.addListener(mapPolygon, 'click', mapClickHandler);
-
-                  _hoverPolygons.push(mapPolygon);
-                });
-
-                if (_options.onHover) {
-                  var transition = getCurrentTransition(hoverRegion.transitions);
-                  _options.onHover(transition[1], transition[2]);
-                }
-              }
-            }
-          });
-        });
-      }
-
-      gmaps.event.addListener(_map, 'click', mapClickHandler);
     },
     setDate: function(date) {
       hideInfoWindow();
@@ -446,6 +492,7 @@
 
   $.fn.timezonePicker = function(method) {
     gmaps = google.maps;
+
     if (methods[method]) {
       return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
     }

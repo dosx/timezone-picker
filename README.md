@@ -3,15 +3,16 @@ Live demo: http://scratch.andrewl.in/timezone-picker/example.html
 Prerequisites
 -------------
   - jQuery
-  - Google Maps Javascript API v3
+  - Google Maps Javascript API v3 or OpenLayers
 
 Usage
 -----
-See example.html
+See gmaps_example.html and openlayers_example.html
 
-    tar xvf tz_json
-    python -m SimpleHTTPServer
-    http://localhost:8000/example.html
+    ./setup_example.sh
+    ./run.sh
+    http://localhost:8000/gmaps_example.html
+    http://localhost:8000/openlayers_example.html
 
 Setup
 -----
