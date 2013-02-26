@@ -127,7 +127,7 @@
         'stopDouble': false
       },
 
-      initialize: function(options) {
+      initialize: function() {
         this.handlerOptions = OpenLayers.Util.extend(
           {}, this.defaultHandlerOptions
         );
@@ -185,18 +185,21 @@
 
     var onPolygonSelect = function(feature) {
       if (feature.clickHandler) {
-        var center = feature.geometry.bounds.getCenterLonLat();
-        center.transform(
+        var position = map.getLonLatFromPixel(new OpenLayers.Pixel(
+          polygonSelect.handlers.feature.evt.layerX,
+          polygonSelect.handlers.feature.evt.layerY
+        ));
+        position.transform(
           map.getProjectionObject(),
           new OpenLayers.Projection("EPSG:4326")
         );
         feature.clickHandler({
           latLng: {
             lat: function() {
-              return center.lat;
+              return position.lat;
             },
             lng: function() {
-              return center.lon;
+              return position.lon;
             }
           }
         });
@@ -285,12 +288,19 @@
         map.getProjectionObject() // to Spherical Mercator Projection
       );
       
-      infoWindow = new OpenLayers.Popup.FramedCloud('infoWindow', 
+      infoWindow = new OpenLayers.Popup.FramedCloud('timezone_picker_infowindow', 
                            pos,
                            new OpenLayers.Size(100,100),
                            content,
                            null, true, null);
       map.addPopup(infoWindow);
+
+      // HACK: callback for popup using a set timeout
+      if (callback) {
+        setTimeout(function() {
+          callback.apply($('#timezone_picker_infowindow'));
+        }, 100);
+      }
     };
 
     return {
@@ -635,14 +645,14 @@
         _options.hoverRegions = true;
       }
 
-      if (_options.useGoogleMaps) {
-        _mapper = new GoogleMapsMapper(_self.get(0), 
+      if (_options.useOpenLayers) {
+        _mapper = new OpenLayersMapper(_self.get(0), 
             mapClickHandler,
             _options.hoverRegions ? mouseMoveHandler : null,
             _options.mapOptions);
       }
       else {
-        _mapper = new OpenLayersMapper(_self.get(0), 
+        _mapper = new GoogleMapsMapper(_self.get(0), 
             mapClickHandler,
             _options.hoverRegions ? mouseMoveHandler : null,
             _options.mapOptions);

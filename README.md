@@ -33,6 +33,7 @@ Options
   - onHover: callback when a timezone is hovered.  Parameters: utcOffset (in minutes), tzNames (array of strings)
   - onReady: callback when all the data files are loaded
   - onSelected: callback when a timezone is selected via the infowindow. Parameters: olsonName, utcOffset (in minutes), tzName (eg. EST, GMT)
+  - useOpenLayers: use OpenLayers instead of Google maps
 
 Methods
 -------
