@@ -1,5 +1,7 @@
-Live Google Maps demo: http://scratch.andrewl.in/timezone-picker/example_site/gmaps_example.html
-Live Open Layers demo: http://scratch.andrewl.in/timezone-picker/example_site/openlayers_example.html
+Live demos
+----------
+  - Google Maps: http://scratch.andrewl.in/timezone-picker/example_site/gmaps_example.html
+  - OpenLayers: http://scratch.andrewl.in/timezone-picker/example_site/openlayers_example.html
 
 Prerequisites
 -------------
