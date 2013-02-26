@@ -19,12 +19,15 @@
   var _maskPng;
   var _needsLoader = 0;
 
-  var gmaps;
-  var GoogleMaps = function(el, mouseClickHandler, mouseMoveHandler, mapOptions) {
+  var GoogleMapsMapper = function(el, mouseClickHandler, mouseMoveHandler, mapOptions) {
+    var gmaps = google.maps;
     var _map;
 
     // Create the maps instance
-    _map = new gmaps.Map(el, mapOptions);
+    _map = new gmaps.Map(el, $.extend({
+        mapTypeId: gmaps.MapTypeId.ROADMAP,
+        center: new gmaps.LatLng(mapOptions.centerLat, mapOptions.centerLng)
+    }, mapOptions));
     gmaps.event.addListener(_map, 'click', mouseClickHandler);
     if (mouseMoveHandler) {
       gmaps.event.addListener(_map, 'mousemove', mouseMoveHandler);
@@ -95,13 +98,217 @@
     };
   };
 
+  var OpenLayersMapper = function(el, mouseClickHandler, mouseMoveHandler, mapOptions) {
+    var infoWindow;
+
+    // Create the maps instance
+    var map = new OpenLayers.Map(OpenLayers.Util.extend({
+      div: el,
+      projection: "EPSG:900913",
+      displayProjection: "EPSG:4326",
+      numZoomLevels: 18
+    }, mapOptions));
+
+    var wms = new OpenLayers.Layer.WMS('OpenLayers WMS',
+        'http://vmap0.tiles.osgeo.org/wms/vmap0', {
+          layers: 'basic'
+        });
+    map.addLayer(wms);
+
+    var vectors = new OpenLayers.Layer.Vector("vector");
+    map.addLayer(vectors);
+
+    OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {                
+      defaultHandlerOptions: {
+        'single': true,
+        'double': false,
+        'pixelTolerance': 0,
+        'stopSingle': false,
+        'stopDouble': false
+      },
+
+      initialize: function(options) {
+        this.handlerOptions = OpenLayers.Util.extend(
+          {}, this.defaultHandlerOptions
+        );
+        OpenLayers.Control.prototype.initialize.apply(
+          this, arguments
+        ); 
+        this.handler = new OpenLayers.Handler.Click(
+          this, {
+              'click': this.trigger
+          }, this.handlerOptions
+        );
+      }, 
+
+      trigger: function(e) {
+        var position = map.getLonLatFromViewPortPx(e.xy);
+        position.transform(
+          map.getProjectionObject(),
+          new OpenLayers.Projection("EPSG:4326")
+        );
+        mapClickHandler({
+          latLng: {
+            lat: function() {
+              return position.lat;
+            },
+            lng: function() {
+              return position.lon;
+            }
+          }
+        });
+      }
+    });
+    var click = new OpenLayers.Control.Click();
+    map.addControl(click);
+    click.activate();
+
+    if (mouseMoveHandler) {
+      map.events.register("mousemove", map, function(e) {
+        var position = map.getLonLatFromViewPortPx(e.xy);
+        position.transform(
+          map.getProjectionObject(),
+          new OpenLayers.Projection("EPSG:4326")
+        );
+        mouseMoveHandler({
+          latLng: {
+            lat: function() {
+              return position.lat;
+            },
+            lng: function() {
+              return position.lon;
+            }
+          }
+        });
+      });
+    }
+
+    var onPolygonSelect = function(feature) {
+      if (feature.clickHandler) {
+        var center = feature.geometry.bounds.getCenterLonLat();
+        center.transform(
+          map.getProjectionObject(),
+          new OpenLayers.Projection("EPSG:4326")
+        );
+        feature.clickHandler({
+          latLng: {
+            lat: function() {
+              return center.lat;
+            },
+            lng: function() {
+              return center.lon;
+            }
+          }
+        });
+      }
+    };
+
+    var onPolygonHighlight = function(e) {
+      if (e.feature.hoverHandler) {
+        e.feature.hoverHandler();
+      }
+    };
+
+    var polygonHover = new OpenLayers.Control.SelectFeature(vectors, {
+      hover: true,
+      highlightOnly: true,
+      renderIntent: "temporary",
+      eventListeners: {
+        beforefeaturehighlighted:onPolygonHighlight
+      }
+    });
+
+    var polygonSelect = new OpenLayers.Control.SelectFeature(vectors, {
+      onSelect: onPolygonSelect
+    });
+
+    map.addControl(polygonHover);
+    map.addControl(polygonSelect);
+    polygonHover.activate();
+    polygonSelect.activate();
+
+    map.setCenter(new OpenLayers.LonLat(0, 0), mapOptions.zoom);
+
+    var addPolygon = function(coords, stroke, fill, clickHandler, mouseMoveHandler) {
+      for (var i = 0; i < coords.length; i++) {
+        coords[i].transform(
+          new OpenLayers.Projection("EPSG:4326"), // transform from WGS 1984
+          map.getProjectionObject()               // to Spherical Mercator Projection
+        );
+      }
+
+      var style = {
+        strokeColor: stroke.color,
+        strokeOpacity: stroke.opacity,
+        strokeWidth: stroke.width,
+        fillColor: fill.color,
+        fillOpacity: fill.opacity
+      };      
+      var linearRing = new OpenLayers.Geometry.LinearRing(coords);
+      var feature = new OpenLayers.Feature.Vector(
+        new OpenLayers.Geometry.Polygon(linearRing), null, style
+      );
+
+      vectors.addFeatures([ feature ]);
+
+      // NOTE: Stuff our click/mousemove handlers on the object for use in onPolygonSelect
+      feature.clickHandler = clickHandler;
+      feature.hoverHandler = mouseMoveHandler;
+ 
+      return feature;
+    };
+
+    var createPoint = function(lat, lng) {
+      return new OpenLayers.Geometry.Point(lng, lat);
+    };
+
+    var hideInfoWindow = function() {
+      if (infoWindow) {
+        map.removePopup(infoWindow);
+        infoWindow.destroy();
+        infoWindow = null;
+      }
+    };
+
+    var removePolygon = function(mapPolygon) {
+      vectors.removeFeatures([ mapPolygon ]);
+    };
+
+    var showInfoWindow = function(pos, content, callback) {
+      if (infoWindow) {
+        hideInfoWindow(infoWindow);
+      }
+
+      pos = new OpenLayers.LonLat(pos.x, pos.y);
+      pos.transform(          
+        new OpenLayers.Projection("EPSG:4326"), // transform from WGS 1984
+        map.getProjectionObject() // to Spherical Mercator Projection
+      );
+      
+      infoWindow = new OpenLayers.Popup.FramedCloud('infoWindow', 
+                           pos,
+                           new OpenLayers.Size(100,100),
+                           content,
+                           null, true, null);
+      map.addPopup(infoWindow);
+    };
+
+    return {
+      addPolygon: addPolygon,
+      createPoint: createPoint,
+      hideInfoWindow: hideInfoWindow,
+      removePolygon: removePolygon,
+      showInfoWindow: showInfoWindow
+    };
+  };
+
   // Forward declarations to satisfy jshint
   var hideLoader, hitTestAndConvert, selectPolygonZone,
     showInfoWindow, slugifyName;
 
   var clearHover = function() {
     $.each(_hoverPolygons, function(i, p) {
-      p.setMap(null);
+      _mapper.removePolygon(p);
     });
 
     _hoverPolygons = [];
@@ -110,7 +317,7 @@
   var clearZones = function() {
     $.each(_mapZones, function(i, zone) {
       $.each(zone, function(j, polygon) {
-        polygon.setMap(null);
+        _mapper.removePolygon(polygon);
       });
     });
 
@@ -274,7 +481,7 @@
     $.each(candidates, function(i, v) {
       drawZone(v, lat, lng, function() {
         $.each(_hoverPolygons, function(i, p) {
-          p.setMap(null);
+          _mapper.removePolygon(p);
         });
         _hoverPolygons = [];
         _currentHoverRegion = null;
@@ -420,18 +627,26 @@
 
       _options.mapOptions = $.extend({
         zoom: _options.initialZoom,
-        mapTypeId: gmaps.MapTypeId.ROADMAP,
-        center: new gmaps.LatLng(_options.initialLat, _options.initialLng)
+        centerLat: _options.initialLat,
+        centerLng: _options.initialLng
       }, _options.mapOptions);
 
       if (typeof _options.hoverRegions === 'undefined') {
         _options.hoverRegions = true;
       }
 
-      _mapper = new GoogleMaps(_self.get(0), 
-          mapClickHandler,
-          _options.hoverRegions ? mouseMoveHandler : null,
-          _options.mapOptions);
+      if (_options.useGoogleMaps) {
+        _mapper = new GoogleMapsMapper(_self.get(0), 
+            mapClickHandler,
+            _options.hoverRegions ? mouseMoveHandler : null,
+            _options.mapOptions);
+      }
+      else {
+        _mapper = new OpenLayersMapper(_self.get(0), 
+            mapClickHandler,
+            _options.hoverRegions ? mouseMoveHandler : null,
+            _options.mapOptions);
+      }
 
       // Load the necessary data files
       var loadCount = _options.hoverRegions ? 2 : 1;
@@ -491,7 +706,6 @@
   };
 
   $.fn.timezonePicker = function(method) {
-    gmaps = google.maps;
 
     if (methods[method]) {
       return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
