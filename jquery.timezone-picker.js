@@ -106,7 +106,21 @@
       div: el,
       projection: "EPSG:900913",
       displayProjection: "EPSG:4326",
-      numZoomLevels: 18
+      numZoomLevels: 18,
+      controls: [
+        new OpenLayers.Control.Attribution(),
+        new OpenLayers.Control.DragPan(),
+        new OpenLayers.Control.Navigation({
+          mouseWheelOptions: {
+            cumulative: false,
+            maxDelta: 6,
+            interval: 50
+          },
+          zoomWheelEnabled: true
+        }),
+        new OpenLayers.Control.Zoom(),
+        new OpenLayers.Control.ZoomBox()
+      ]
     }, mapOptions));
 
     var wms = new OpenLayers.Layer.WMS('OpenLayers WMS',
@@ -136,7 +150,7 @@
         ); 
         this.handler = new OpenLayers.Handler.Click(
           this, {
-              'click': this.trigger
+              click: this.trigger
           }, this.handlerOptions
         );
       }, 
@@ -447,7 +461,7 @@
 
       // If the count is odd, we are in the polygon
       var odd = (rayTest % 2 === 1);
-      inZone |= odd;
+      inZone = inZone || odd;
       if (odd) {
         selectedPolygon = polygon;
       }
