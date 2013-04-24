@@ -48,6 +48,13 @@ Methods
 CSS Classes
 -----------
   - timezone-picker-infowindow: the main content container for the infowindow
+  - NOTE: if you are using Twitter Bootstrap and google maps, you may need something like
+```
+#zonepicker img {
+  max-width: none;
+}
+```
+    to prevent distortion of your map controls (thanks michaelahlers!)
 
 For Data File Generation
 ------------------------
