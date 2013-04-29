@@ -402,7 +402,8 @@
     var now = _options.date.getTime() / 1000;
     var selected = null;
     $.each(transitions, function(i, transition) {
-      if (transition[0] < now && transitions[i + 1][0] > now) {
+      if (transition[0] < now && i < transitions.length - 1 && 
+          transitions[i + 1][0] > now) {
         selected = transition;
       }
     });
