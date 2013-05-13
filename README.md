@@ -22,8 +22,6 @@ Setup
 To use in your site, extract tz_json.tgz to a web-accessible location on your
 server and pass in the path as the jsonRootUrl option
 
-For those who use OpenLayers with Twitter Bootstrap, you need to make `.img` to have `max-width: none`.
-
 Options
 -------
   - fillColor: the color of the fill of the rendered timezones (default '#ffcccc')
@@ -50,7 +48,7 @@ Methods
 CSS Classes
 -----------
   - timezone-picker-infowindow: the main content container for the infowindow
-  - NOTE: if you are using Twitter Bootstrap and google maps, you may need something like
+  - NOTE: if you are using Twitter Bootstrap and Google maps or OpenLayers, you may need something like
 ```
 #zonepicker img {
   max-width: none;
