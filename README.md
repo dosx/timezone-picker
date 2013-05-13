@@ -60,6 +60,8 @@ CSS Classes
 
 For Data File Generation
 ------------------------
+You do not need to do all of the steps mentioned below if you're going to use `tz_json.tgz`.
+
 This plugin uses a bunch of timezone data files on a web server.
 
   - bounding_boxes.json: an array of bounding boxes for each timezone (for hit testing)
@@ -79,8 +81,6 @@ To Generate all timezone data JSON files
   - Download and extract the tz_world file from http://efele.net/maps/tz/world/tz_world.zip
   - `python script/gen_json.py <path-to-tz_world.shp> <output-dir>`
   - Be very patient...
-
-Or you could just use the files from extracting `tz_json.tgz`.
 
 Acknowledgments
 ----------------
