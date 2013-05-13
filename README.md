@@ -22,6 +22,8 @@ Setup
 To use in your site, extract tz_json.tgz to a web-accessible location on your
 server and pass in the path as the jsonRootUrl option
 
+For those who use OpenLayers with Twitter Bootstrap, you need to make `.img` to have `max-width: none`.
+
 Options
 -------
   - fillColor: the color of the fill of the rendered timezones (default '#ffcccc')
@@ -64,16 +66,21 @@ This plugin uses a bunch of timezone data files on a web server.
   - hover_regions.json: an array of polygons representing hover regions for each timezone
   - polygons/*.json: polygon definitions for each timezone
 
-Requires Python 2.6+
-Requires libgeos-dev (sudo apt-get install libgeos-dev)
-Requires shapely (sudo pip install shapely)
-Requires pytz (sudo pip install pytz)
+Requires:
+
+* Python 2.6+
+* libgeos-dev (sudo apt-get install libgeos-dev) (for Mac OS, install this: http://trac.osgeo.org/geos/)
+* pip (sudo easy_install pip)
+* shapely (sudo pip install shapely)
+* pytz (sudo pip install pytz)
 
 To Generate all timezone data JSON files
 
   - Download and extract the tz_world file from http://efele.net/maps/tz/world/tz_world.zip
-  - python script/gen_json.py <path-to-tz_world.shp> <output-dir>
+  - `python script/gen_json.py <path-to-tz_world.shp> <output-dir>`
   - Be very patient...
+
+Or you could just use the files from extracting `tz_json.tgz`.
 
 Acknowledgments
 ----------------
