@@ -60,7 +60,7 @@ CSS Classes
 
 For Data File Generation
 ------------------------
-You do not need to do all of the steps mentioned below if you're going to use `tz_json.tgz`.
+You do not need to do all of the steps mentioned below if you're going to use `tz_json.tgz` (the timezone data JSON files are in there already).
 
 This plugin uses a bunch of timezone data files on a web server.
 
