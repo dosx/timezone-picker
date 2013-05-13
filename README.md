@@ -22,8 +22,6 @@ Setup
 To use in your site, extract tz_json.tgz to a web-accessible location on your
 server and pass in the path as the jsonRootUrl option
 
-For those who use OpenLayers with Twitter Bootstrap, you need to make `.img` to have `max-width: none`.
-
 Options
 -------
   - fillColor: the color of the fill of the rendered timezones (default '#ffcccc')
@@ -50,7 +48,7 @@ Methods
 CSS Classes
 -----------
   - timezone-picker-infowindow: the main content container for the infowindow
-  - NOTE: if you are using Twitter Bootstrap and google maps, you may need something like
+  - NOTE: if you are using Twitter Bootstrap and Google maps or OpenLayers, you may need something like
 ```
 #zonepicker img {
   max-width: none;
@@ -60,6 +58,8 @@ CSS Classes
 
 For Data File Generation
 ------------------------
+You do not need to do all of the steps mentioned below if you're going to use `tz_json.tgz` (the timezone data JSON files are in there already).
+
 This plugin uses a bunch of timezone data files on a web server.
 
   - bounding_boxes.json: an array of bounding boxes for each timezone (for hit testing)
@@ -79,8 +79,6 @@ To Generate all timezone data JSON files
   - Download and extract the tz_world file from http://efele.net/maps/tz/world/tz_world.zip
   - `python script/gen_json.py <path-to-tz_world.shp> <output-dir>`
   - Be very patient...
-
-Or you could just use the files from extracting `tz_json.tgz`.
 
 Acknowledgments
 ----------------
