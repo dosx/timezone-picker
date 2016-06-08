@@ -584,7 +584,7 @@
         (adjusted.getTimezoneOffset() + utcOffset) * 60 * 1000);
 
       showInfoWindow('<h2>' +
-        olsonName.split('/').slice(-1)[0].replace('_', ' ') + ' ' +
+        olsonName + ' ' +
         '(' + tzName + ')</h2>' +
         '<div class="metadata">' +
         '<div>Current Time: ' +
