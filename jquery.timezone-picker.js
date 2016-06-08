@@ -76,7 +76,7 @@
 
       gmaps.event.addListener(infowindow, 'domready', function() {
         // HACK: Put rounded corners on the infowindow
-        $('#timezone_picker_infowindow').parent().parent().parent().prev().css('border-radius', 
+        $('#timezone_picker_infowindow').parent().parent().parent().prev().css('border-radius',
             '5px');
 
         if (callback) {
@@ -123,16 +123,16 @@
       ]
     }, mapOptions));
 
-    var wms = new OpenLayers.Layer.WMS('OpenLayers WMS',
-        'http://vmap0.tiles.osgeo.org/wms/vmap0', {
-          layers: 'basic'
-        });
-    map.addLayer(wms);
+    var newLayer = new OpenLayers.Layer.OSM(
+      "OSM Layer",
+      "http://a.tile.openstreetmap.org/${z}/${x}/${y}.png"
+    );
+    map.addLayer(newLayer);
 
     var vectors = new OpenLayers.Layer.Vector("vector");
     map.addLayer(vectors);
 
-    OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {                
+    OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {
       defaultHandlerOptions: {
         'single': true,
         'double': false,
@@ -147,13 +147,13 @@
         );
         OpenLayers.Control.prototype.initialize.apply(
           this, arguments
-        ); 
+        );
         this.handler = new OpenLayers.Handler.Click(
           this, {
               click: this.trigger
           }, this.handlerOptions
         );
-      }, 
+      },
 
       trigger: function(e) {
         var position = map.getLonLatFromViewPortPx(e.xy);
@@ -260,7 +260,7 @@
         strokeWidth: stroke.width,
         fillColor: fill.color,
         fillOpacity: fill.opacity
-      };      
+      };
       var linearRing = new OpenLayers.Geometry.LinearRing(coords);
       var feature = new OpenLayers.Feature.Vector(
         new OpenLayers.Geometry.Polygon(linearRing), null, style
@@ -271,7 +271,7 @@
       // NOTE: Stuff our click/mousemove handlers on the object for use in onPolygonSelect
       feature.clickHandler = clickHandler;
       feature.hoverHandler = mouseMoveHandler;
- 
+
       return feature;
     };
 
@@ -297,12 +297,12 @@
       }
 
       pos = new OpenLayers.LonLat(pos.x, pos.y);
-      pos.transform(          
+      pos.transform(
         new OpenLayers.Projection("EPSG:4326"), // transform from WGS 1984
         map.getProjectionObject() // to Spherical Mercator Projection
       );
-      
-      infoWindow = new OpenLayers.Popup.FramedCloud('timezone_picker_infowindow', 
+
+      infoWindow = new OpenLayers.Popup.FramedCloud('timezone_picker_infowindow',
                            pos,
                            new OpenLayers.Size(100,100),
                            content,
@@ -383,7 +383,7 @@
           }, function() {
             selectPolygonZone(polygonInfo.polygon);
           }, clearHover);
-            
+
           _mapZones[name].push(mapPolygon);
         });
 
@@ -402,7 +402,7 @@
     var now = _options.date.getTime() / 1000;
     var selected = null;
     $.each(transitions, function(i, transition) {
-      if (transition[0] < now && i < transitions.length - 1 && 
+      if (transition[0] < now && i < transitions.length - 1 &&
           transitions[i + 1][0] > now) {
         selected = transition;
       }
@@ -661,13 +661,13 @@
       }
 
       if (_options.useOpenLayers) {
-        _mapper = new OpenLayersMapper(_self.get(0), 
+        _mapper = new OpenLayersMapper(_self.get(0),
             mapClickHandler,
             _options.hoverRegions ? mouseMoveHandler : null,
             _options.mapOptions);
       }
       else {
-        _mapper = new GoogleMapsMapper(_self.get(0), 
+        _mapper = new GoogleMapsMapper(_self.get(0),
             mapClickHandler,
             _options.hoverRegions ? mouseMoveHandler : null,
             _options.mapOptions);
