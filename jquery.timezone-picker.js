@@ -389,7 +389,7 @@
 
         selectPolygonZone(result.selectedPolygon);
       }
-    }).error(function() {
+    }).fail(function() {
       console.warn(arguments);
     });
   };
