@@ -89,12 +89,17 @@
       _map.lastInfoWindow = infowindow;
     };
 
+    var refreshMap = function() {
+        google.maps.event.trigger(_map, 'resize'); 
+    }
+
     return {
       addPolygon: addPolygon,
       createPoint: createPoint,
       hideInfoWindow: hideInfoWindow,
       removePolygon: removePolygon,
-      showInfoWindow: showInfoWindow
+      showInfoWindow: showInfoWindow,
+      refreshMap: refreshMap
     };
   };
 
@@ -727,9 +732,14 @@
           }
         });
       }
+    },
+    refreshMap: function () {
+        if (_mapper.refreshMap) {  
+            _mapper.refreshMap();
+        }
     }
   };
-
+    
   $.fn.timezonePicker = function(method) {
 
     if (methods[method]) {
