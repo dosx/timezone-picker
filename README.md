@@ -69,10 +69,11 @@ This plugin uses a bunch of timezone data files on a web server.
 Requires:
 
 * Python 2.6+
-* libgeos-dev (sudo apt-get install libgeos-dev) (for Mac OS, install this: http://trac.osgeo.org/geos/)
+* libgeos-dev (sudo apt-get install libgeos-dev) (for Mac OS, brew install geos)
 * pip (sudo easy_install pip)
 * shapely (sudo pip install shapely)
 * pytz (sudo pip install pytz)
+* simplejson (sudo pip install simplejson)
 
 To Generate all timezone data JSON files
 
